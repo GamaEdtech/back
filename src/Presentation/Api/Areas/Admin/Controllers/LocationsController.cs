@@ -126,7 +126,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
         }
 
         [HttpPut("countries/{id:int}"), Produces<ApiResponse<ManageLocationResponseViewModel>>()]
-        public async Task<IActionResult> UpdateCountry([FromRoute] int id, [NotNull, FromBody] ManageLocationRequestViewModel request)
+        public async Task<IActionResult> UpdateCountry([FromRoute] int id, [NotNull, FromBody] UpdateLocationRequestViewModel request)
         {
             try
             {
@@ -283,7 +283,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
         }
 
         [HttpPut("states/{id:int}"), Produces<ApiResponse<Void>>()]
-        public async Task<IActionResult> UpdateState([FromRoute] int id, [NotNull, FromBody] ManageLocationRequestViewModel request)
+        public async Task<IActionResult> UpdateState([FromRoute] int id, [NotNull, FromBody] UpdateLocationRequestViewModel request)
         {
             try
             {
@@ -440,7 +440,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
         }
 
         [HttpPut("cities/{id:int}"), Produces<ApiResponse<ManageLocationResponseViewModel>>()]
-        public async Task<IActionResult> UpdateCity([FromRoute] int id, [NotNull, FromBody] ManageLocationRequestViewModel request)
+        public async Task<IActionResult> UpdateCity([FromRoute] int id, [NotNull, FromBody] UpdateLocationRequestViewModel request)
         {
             try
             {

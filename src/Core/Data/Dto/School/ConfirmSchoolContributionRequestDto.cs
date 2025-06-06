@@ -4,6 +4,5 @@ namespace GamaEdtech.Data.Dto.School
     {
         public required long ContributionId { get; set; }
         public long? SchoolId { get; set; }
-        public required SchoolContributionDto Data { get; set; }
     }
 }

@@ -2,14 +2,12 @@ namespace GamaEdtech.Presentation.ViewModel.Question
 {
     using GamaEdtech.Common.DataAnnotation;
 
-    public sealed class ManageQuestionRequestViewModel
+    public sealed class UpdateQuestionRequestViewModel
     {
         [Display]
-        [Required]
         public string? Body { get; set; }
 
         [Display]
-        [Required]
         public IEnumerable<OptionViewModel>? Options { get; set; }
     }
 }

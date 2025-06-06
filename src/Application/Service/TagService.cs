@@ -112,9 +112,9 @@ namespace GamaEdtech.Application.Service
                         };
                     }
 
-                    tag.Name = requestDto.Name;
-                    tag.Icon = requestDto.Icon;
-                    tag.TagType = requestDto.TagType;
+                    tag.Name = requestDto.Name ?? tag.Name;
+                    tag.Icon = requestDto.Icon ?? tag.Icon;
+                    tag.TagType = requestDto.TagType ?? tag.TagType;
 
                     _ = repository.Update(tag);
                 }

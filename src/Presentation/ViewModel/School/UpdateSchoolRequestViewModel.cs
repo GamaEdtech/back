@@ -7,17 +7,15 @@ namespace GamaEdtech.Presentation.ViewModel.School
     using GamaEdtech.Common.DataAnnotation;
     using GamaEdtech.Domain.Enumeration;
 
-    public sealed class ManageSchoolRequestViewModel
+    public sealed class UpdateSchoolRequestViewModel
     {
         [Display]
-        [Required]
         public string? Name { get; set; }
 
         [Display]
         public string? LocalName { get; set; }
 
         [Display]
-        [Required]
         [JsonConverter(typeof(EnumerationConverter<SchoolType, byte>))]
         public SchoolType? SchoolType { get; set; }
 

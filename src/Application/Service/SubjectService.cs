@@ -94,8 +94,8 @@ namespace GamaEdtech.Application.Service
                         };
                     }
 
-                    subject.Title = requestDto.Title;
-                    subject.Order = requestDto.Order;
+                    subject.Title = requestDto.Title ?? subject.Title;
+                    subject.Order = requestDto.Order ?? subject.Order;
 
                     _ = repository.Update(subject);
                 }
@@ -104,7 +104,7 @@ namespace GamaEdtech.Application.Service
                     subject = new Subject
                     {
                         Title = requestDto.Title,
-                        Order = requestDto.Order,
+                        Order = requestDto.Order.GetValueOrDefault(),
                     };
                     repository.Add(subject);
                 }

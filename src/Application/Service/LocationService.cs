@@ -96,12 +96,12 @@ namespace GamaEdtech.Application.Service
                         };
                     }
 
-                    location.ParentId = requestDto.ParentId;
-                    location.Title = requestDto.Title;
-                    location.Code = requestDto.Code;
-                    location.LocationType = requestDto.LocationType;
-                    location.Coordinates = requestDto.Coordinates;
-                    location.LocalTitle = requestDto.LocalTitle;
+                    location.ParentId = requestDto.ParentId ?? location.ParentId;
+                    location.Title = requestDto.Title ?? location.Title;
+                    location.Code = requestDto.Code ?? location.Code;
+                    location.LocationType = requestDto.LocationType ?? location.LocationType;
+                    location.Coordinates = requestDto.Coordinates ?? location.Coordinates;
+                    location.LocalTitle = requestDto.LocalTitle ?? location.LocalTitle;
 
                     _ = repository.Update(location);
                 }

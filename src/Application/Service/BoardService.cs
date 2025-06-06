@@ -93,9 +93,9 @@ namespace GamaEdtech.Application.Service
                         };
                     }
 
-                    board.Title = requestDto.Title;
-                    board.Description = requestDto.Description;
-                    board.Icon = requestDto.Icon;
+                    board.Title = requestDto.Title ?? board.Title;
+                    board.Description = requestDto.Description ?? board.Description;
+                    board.Icon = requestDto.Icon ?? board.Icon;
 
                     _ = repository.Update(board);
                 }

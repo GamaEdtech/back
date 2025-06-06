@@ -1,7 +1,6 @@
 namespace GamaEdtech.Presentation.Api.Controllers
 {
     using System.Diagnostics.CodeAnalysis;
-    using System.Text.Json;
 
     using Asp.Versioning;
 
@@ -101,6 +100,7 @@ namespace GamaEdtech.Presentation.Api.Controllers
                         CreationUser = result.Data.CreationUser,
                         VisibilityType = result.Data.VisibilityType,
                         PublishDate = result.Data.PublishDate,
+                        Keywords = result.Data.Keywords,
                         Tags = result.Data.Tags?.Select(t => new TagResponseViewModel
                         {
                             Id = t.Id,
@@ -289,13 +289,12 @@ namespace GamaEdtech.Presentation.Api.Controllers
                 var specification = new IdEqualsSpecification<Contribution, long>(contributionId)
                     .And(new CreationUserIdEqualsSpecification<Contribution, ApplicationUser, int>(User.UserId()))
                     .And(new CategoryTypeEqualsSpecification<Contribution>(CategoryType.Post));
-                var result = await contributionService.Value.GetContributionAsync(specification);
+                var result = await contributionService.Value.GetContributionAsync<PostContributionDto>(specification);
 
                 PostContributionResponseViewModel? viewModel = null;
                 if (result.Data?.Data is not null)
                 {
-                    var dto = JsonSerializer.Deserialize<PostContributionDto>(result.Data.Data);
-                    viewModel = dto is null ? null : MapFrom(dto);
+                    viewModel = result.Data.Data is null ? null : MapFrom(result.Data.Data);
                 }
 
                 return Ok<PostContributionResponseViewModel>(new(result.Errors)
@@ -310,8 +309,10 @@ namespace GamaEdtech.Presentation.Api.Controllers
                     Body = dto.Body,
                     Tags = dto.Tags,
                     ImageUri = fileService.Value.GetFileUri(dto.ImageId, ContainerType.Post).Data,
-                    PublishDate = dto.PublishDate,
-                    VisibilityType = dto.VisibilityType,
+                    PublishDate = dto.PublishDate.GetValueOrDefault(),
+                    VisibilityType = dto.VisibilityType!,
+                    Keywords = dto.Keywords,
+                    Slug = dto.Slug,
                 };
             }
             catch (Exception exc)
@@ -328,7 +329,19 @@ namespace GamaEdtech.Presentation.Api.Controllers
         {
             try
             {
-                var dto = MapTo(request, null);
+                ManagePostContributionRequestDto dto = new()
+                {
+                    UserId = User.UserId(),
+                    Title = request.Title,
+                    Slug = request.Slug,
+                    Summary = request.Summary,
+                    Body = request.Body,
+                    Image = request.Image,
+                    Tags = request.Tags,
+                    PublishDate = request.PublishDate.GetValueOrDefault(),
+                    VisibilityType = request.VisibilityType!,
+                    Keywords = request.Keywords,
+                };
                 var result = await blogService.Value.ManagePostContributionAsync(dto);
 
                 return Ok<ManagePostContributionResponseViewModel>(new(result.Errors)
@@ -346,7 +359,7 @@ namespace GamaEdtech.Presentation.Api.Controllers
 
         [HttpPut("contributions/{contributionId:long}"), Produces<ApiResponse<ManagePostContributionResponseViewModel>>()]
         [Permission(policy: null)]
-        public async Task<IActionResult<ManagePostContributionResponseViewModel>> UpdatePostContribution([FromRoute] long contributionId, [NotNull, FromForm] PostContributionViewModel request)
+        public async Task<IActionResult<ManagePostContributionResponseViewModel>> UpdatePostContribution([FromRoute] long contributionId, [NotNull, FromForm] UpdatePostContributionViewModel request)
         {
             try
             {
@@ -356,7 +369,20 @@ namespace GamaEdtech.Presentation.Api.Controllers
                     return Ok<ManagePostContributionResponseViewModel>(new(new Error { Message = "InvalidRequest" }));
                 }
 
-                var dto = MapTo(request, contributionId);
+                ManagePostContributionRequestDto dto = new()
+                {
+                    ContributionId = contributionId,
+                    UserId = User.UserId(),
+                    Title = request.Title,
+                    Slug = request.Slug,
+                    Summary = request.Summary,
+                    Body = request.Body,
+                    Image = request.Image,
+                    Tags = request.Tags,
+                    PublishDate = request.PublishDate.GetValueOrDefault(),
+                    VisibilityType = request.VisibilityType!,
+                    Keywords = request.Keywords,
+                };
                 var result = await blogService.Value.ManagePostContributionAsync(dto);
 
                 return Ok<ManagePostContributionResponseViewModel>(new(result.Errors)
@@ -373,19 +399,5 @@ namespace GamaEdtech.Presentation.Api.Controllers
         }
 
         #endregion
-
-        private ManagePostContributionRequestDto MapTo(PostContributionViewModel request, long? contributionId) => new()
-        {
-            ContributionId = contributionId,
-            UserId = User.UserId(),
-            Title = request.Title,
-            Slug = request.Slug,
-            Summary = request.Summary,
-            Body = request.Body,
-            Image = request.Image,
-            Tags = request.Tags,
-            PublishDate = request.PublishDate.GetValueOrDefault(),
-            VisibilityType = request.VisibilityType!,
-        };
     }
 }

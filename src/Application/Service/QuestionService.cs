@@ -123,8 +123,8 @@ namespace GamaEdtech.Application.Service
                         };
                     }
 
-                    question.Body = requestDto.Body;
-                    question.Options = [.. requestDto.Options.Select(t => new QuestionOption
+                    question.Body = requestDto.Body ?? question.Body;
+                    question.Options = requestDto.Options is null ? question.Options : [.. requestDto.Options.Select(t => new QuestionOption
                     {
                         Body = t.Body,
                         IsCorrect = t.IsCorrect,
@@ -138,7 +138,7 @@ namespace GamaEdtech.Application.Service
                     question = new Question
                     {
                         Body = requestDto.Body,
-                        Options = [.. requestDto.Options.Select(t => new QuestionOption
+                        Options = [.. requestDto.Options!.Select(t => new QuestionOption
                         {
                             Body = t.Body,
                             IsCorrect = t.IsCorrect,

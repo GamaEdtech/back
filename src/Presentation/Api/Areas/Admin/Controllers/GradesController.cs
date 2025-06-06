@@ -106,7 +106,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
         }
 
         [HttpPut("{id:int}"), Produces<ApiResponse<ManageGradeResponseViewModel>>()]
-        public async Task<IActionResult<ManageGradeResponseViewModel>> UpdateGrade([FromRoute] int id, [NotNull, FromBody] ManageGradeRequestViewModel request)
+        public async Task<IActionResult<ManageGradeResponseViewModel>> UpdateGrade([FromRoute] int id, [NotNull, FromBody] UpdateGradeRequestViewModel request)
         {
             try
             {

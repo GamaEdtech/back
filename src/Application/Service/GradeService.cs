@@ -97,10 +97,10 @@ namespace GamaEdtech.Application.Service
                         };
                     }
 
-                    grade.Title = requestDto.Title;
-                    grade.Description = requestDto.Description;
-                    grade.Icon = requestDto.Icon;
-                    grade.BoardId = requestDto.BoardId;
+                    grade.Title = requestDto.Title ?? grade.Title;
+                    grade.Description = requestDto.Description ?? grade.Description;
+                    grade.Icon = requestDto.Icon ?? grade.Icon;
+                    grade.BoardId = requestDto.BoardId ?? grade.BoardId;
 
                     _ = repository.Update(grade);
                 }
@@ -111,7 +111,7 @@ namespace GamaEdtech.Application.Service
                         Title = requestDto.Title,
                         Description = requestDto.Description,
                         Icon = requestDto.Icon,
-                        BoardId = requestDto.BoardId,
+                        BoardId = requestDto.BoardId.GetValueOrDefault(),
                     };
                     repository.Add(grade);
                 }

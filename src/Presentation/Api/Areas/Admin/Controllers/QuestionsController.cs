@@ -88,7 +88,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
             {
                 List<OptionDto> options = [];
                 var index = 1;
-                foreach (var item in request.Options)
+                foreach (var item in request.Options!)
                 {
                     options.Add(new()
                     {
@@ -119,22 +119,27 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
         }
 
         [HttpPut("{id:long}"), Produces<ApiResponse<ManageQuestionResponseViewModel>>()]
-        public async Task<IActionResult<ManageQuestionResponseViewModel>> UpdateQuestion([FromRoute] long id, [NotNull, FromBody] ManageQuestionRequestViewModel request)
+        public async Task<IActionResult<ManageQuestionResponseViewModel>> UpdateQuestion([FromRoute] long id, [NotNull, FromBody] UpdateQuestionRequestViewModel request)
         {
             try
             {
-                List<OptionDto> options = [];
-                var index = 1;
-                foreach (var item in request.Options)
+                List<OptionDto>? options = null;
+                if (request.Options is not null)
                 {
-                    options.Add(new()
+                    var index = 1;
+                    foreach (var item in request.Options)
                     {
-                        Body = item.Body,
-                        IsCorrect = item.IsCorrect,
-                        Index = index,
-                    });
+                        options ??= [];
 
-                    index++;
+                        options.Add(new()
+                        {
+                            Body = item.Body,
+                            IsCorrect = item.IsCorrect,
+                            Index = index,
+                        });
+
+                        index++;
+                    }
                 }
                 var result = await questionService.Value.ManageQuestionAsync(new ManageQuestionRequestDto
                 {

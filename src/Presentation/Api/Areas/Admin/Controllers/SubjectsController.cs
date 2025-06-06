@@ -107,7 +107,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
         }
 
         [HttpPut("{id:int}"), Produces<ApiResponse<ManageSubjectResponseViewModel>>()]
-        public async Task<IActionResult> UpdateSubject([FromRoute] int id, [NotNull, FromBody] ManageSubjectRequestViewModel request)
+        public async Task<IActionResult> UpdateSubject([FromRoute] int id, [NotNull, FromBody] UpdateSubjectRequestViewModel request)
         {
             try
             {

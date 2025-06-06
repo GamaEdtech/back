@@ -67,10 +67,10 @@ namespace GamaEdtech.Application.Service
                         };
                     }
 
-                    votingPower.ProposalId = requestDto.ProposalId;
-                    votingPower.WalletAddress = requestDto.WalletAddress;
-                    votingPower.Amount = requestDto.Amount;
-                    votingPower.TokenAccount = requestDto.TokenAccount;
+                    votingPower.ProposalId = string.IsNullOrEmpty(requestDto.ProposalId) ? votingPower.ProposalId : requestDto.ProposalId;
+                    votingPower.WalletAddress = string.IsNullOrEmpty(requestDto.WalletAddress) ? votingPower.WalletAddress : requestDto.WalletAddress;
+                    votingPower.Amount = requestDto.Amount ?? votingPower.Amount;
+                    votingPower.TokenAccount = string.IsNullOrEmpty(requestDto.TokenAccount) ? votingPower.TokenAccount : requestDto.TokenAccount;
 
                     _ = repository.Update(votingPower);
                 }
@@ -80,7 +80,7 @@ namespace GamaEdtech.Application.Service
                     {
                         ProposalId = requestDto.ProposalId,
                         WalletAddress = requestDto.WalletAddress,
-                        Amount = requestDto.Amount,
+                        Amount = requestDto.Amount.GetValueOrDefault(),
                         TokenAccount = requestDto.TokenAccount,
                     };
                     repository.Add(votingPower);

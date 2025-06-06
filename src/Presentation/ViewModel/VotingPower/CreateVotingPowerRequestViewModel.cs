@@ -2,7 +2,7 @@ namespace GamaEdtech.Presentation.ViewModel.VotingPower
 {
     using GamaEdtech.Common.DataAnnotation;
 
-    public sealed class ManageVotingPowerRequestViewModel
+    public sealed class CreateVotingPowerRequestViewModel
     {
         [Display]
         [Required]

@@ -64,6 +64,10 @@ namespace GamaEdtech.Domain.Entity
         [Required]
         public VisibilityType VisibilityType { get; set; }
 
+        [Column(nameof(Keywords), DataType.UnicodeString)]
+        [StringLength(500)]
+        public string? Keywords { get; set; }
+
         public virtual ICollection<PostTag>? PostTags { get; set; }
 
         public void Configure([NotNull] EntityTypeBuilder<Post> builder)

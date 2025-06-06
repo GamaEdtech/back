@@ -2,7 +2,6 @@ namespace GamaEdtech.Application.Service
 {
     using System;
     using System.Diagnostics.CodeAnalysis;
-    using System.Text.Json;
     using System.Threading.Tasks;
 
     using EntityFramework.Exceptions.Common;
@@ -95,6 +94,7 @@ namespace GamaEdtech.Application.Service
                     t.VisibilityType,
                     CreationUser = t.CreationUser.FirstName + " " + t.CreationUser.LastName,
                     t.PublishDate,
+                    t.Keywords,
                     Tags = t.PostTags == null ? null : t.PostTags.Select(s => new TagDto
                     {
                         Icon = s.Tag.Icon,
@@ -124,6 +124,7 @@ namespace GamaEdtech.Application.Service
                     Tags = post.Tags,
                     VisibilityType = post.VisibilityType,
                     PublishDate = post.PublishDate,
+                    Keywords = post.Keywords,
                 };
 
                 return new(OperationResult.Succeeded) { Data = result };
@@ -146,6 +147,7 @@ namespace GamaEdtech.Application.Service
                         .And(new CategoryTypeEqualsSpecification<Contribution>(CategoryType.Post))
                         .And(new StatusEqualsSpecification<Contribution>(Status.Draft).Or(new StatusEqualsSpecification<Contribution>(Status.Rejected)));
                     var data = await contributionService.Value.ExistsContributionAsync(specification);
+
                     if (data.OperationResult is not OperationResult.Succeeded)
                     {
                         return new(data.OperationResult) { Errors = data.Errors };
@@ -193,14 +195,15 @@ namespace GamaEdtech.Application.Service
                     Slug = requestDto.Slug,
                     PublishDate = requestDto.PublishDate,
                     VisibilityType = requestDto.VisibilityType,
+                    Keywords = requestDto.Keywords,
                 };
 
-                var contributionResult = await contributionService.Value.ManageContributionAsync(new ManageContributionRequestDto
+                var contributionResult = await contributionService.Value.ManageContributionAsync(new ManageContributionRequestDto<PostContributionDto>
                 {
                     CategoryType = CategoryType.Post,
                     IdentifierId = null,
                     Status = Status.Draft,
-                    Data = JsonSerializer.Serialize(dto),
+                    Data = dto,
                     Id = requestDto.ContributionId,
                 });
                 if (contributionResult.OperationResult is not OperationResult.Succeeded)
@@ -390,31 +393,31 @@ namespace GamaEdtech.Application.Service
             {
                 var contributionSpecification = new IdEqualsSpecification<Contribution, long>(requestDto.ContributionId)
                     .And(new CategoryTypeEqualsSpecification<Contribution>(CategoryType.Post));
-                var result = await contributionService.Value.ConfirmContributionAsync(contributionSpecification);
+                var result = await contributionService.Value.ConfirmContributionAsync<PostContributionDto>(contributionSpecification);
                 if (result.Data is null)
                 {
                     return new(OperationResult.Failed) { Errors = result.Errors };
                 }
 
-                var dto = JsonSerializer.Deserialize<PostContributionDto>(result.Data.Data!)!;
                 var uow = UnitOfWorkProvider.Value.CreateUnitOfWork();
                 var postRepository = uow.GetRepository<Post>();
                 postRepository.Add(new()
                 {
-                    Body = dto.Body,
-                    CreationUserId = dto.CreationUserId,
-                    CreationDate = dto.CreationDate,
-                    ImageId = dto.ImageId,
-                    Title = dto.Title,
-                    Slug = dto.Slug,
-                    Summary = dto.Summary,
+                    Body = result.Data.Data!.Body,
+                    CreationUserId = result.Data.Data!.CreationUserId.GetValueOrDefault(),
+                    CreationDate = result.Data.Data!.CreationDate.GetValueOrDefault(),
+                    ImageId = result.Data.Data!.ImageId,
+                    Title = result.Data.Data!.Title,
+                    Slug = result.Data.Data!.Slug,
+                    Summary = result.Data.Data!.Summary,
                     Status = Status.Confirmed,
-                    PublishDate = dto.PublishDate,
-                    VisibilityType = dto.VisibilityType,
-                    PostTags = dto.Tags?.Select(t => new PostTag
+                    PublishDate = result.Data.Data!.PublishDate.GetValueOrDefault(),
+                    VisibilityType = result.Data.Data!.VisibilityType!,
+                    Keywords = result.Data.Data!.Keywords,
+                    PostTags = result.Data.Data!.Tags?.Select(t => new PostTag
                     {
-                        CreationUserId = dto.CreationUserId,
-                        CreationDate = dto.CreationDate,
+                        CreationUserId = result.Data.Data!.CreationUserId.GetValueOrDefault(),
+                        CreationDate = result.Data.Data!.CreationDate.GetValueOrDefault(),
                         TagId = t,
                     }).ToList(),
                 });

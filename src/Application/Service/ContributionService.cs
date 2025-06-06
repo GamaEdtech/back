@@ -2,6 +2,7 @@ namespace GamaEdtech.Application.Service
 {
     using System;
     using System.Diagnostics.CodeAnalysis;
+    using System.Text.Json;
 
     using GamaEdtech.Application.Interface;
     using GamaEdtech.Common.Core;
@@ -53,26 +54,37 @@ namespace GamaEdtech.Application.Service
             }
         }
 
-        public async Task<ResultData<ContributionDto>> GetContributionAsync([NotNull] ISpecification<Contribution> specification)
+        public async Task<ResultData<ContributionDto<T>>> GetContributionAsync<T>([NotNull] ISpecification<Contribution> specification)
         {
             try
             {
                 var uow = UnitOfWorkProvider.Value.CreateUnitOfWork();
-                var contribution = await uow.GetRepository<Contribution>().GetManyQueryable(specification).Select(t => new ContributionDto
+                var dto = await uow.GetRepository<Contribution>().GetManyQueryable(specification).Select(t => new
                 {
-                    Id = t.Id,
-                    Comment = t.Comment,
-                    Data = t.Data,
-                    IdentifierId = t.IdentifierId,
-                    CategoryType = t.CategoryType,
+                    t.Id,
+                    t.Comment,
+                    t.Data,
+                    t.IdentifierId,
+                    t.CategoryType,
                 }).FirstOrDefaultAsync();
-
-                return contribution is null
-                    ? new(OperationResult.NotFound)
+                if (dto is null)
+                {
+                    return new(OperationResult.NotFound)
                     {
                         Errors = [new() { Message = Localizer.Value["ContributionNotFound"] },],
-                    }
-                    : new(OperationResult.Succeeded) { Data = contribution };
+                    };
+                }
+
+                ContributionDto<T> contribution = new()
+                {
+                    Id = dto.Id,
+                    Comment = dto.Comment,
+                    CategoryType = dto.CategoryType,
+                    IdentifierId = dto.IdentifierId,
+                    Data = dto.Data is null ? default : JsonSerializer.Deserialize<T>(dto.Data),
+                };
+
+                return new(OperationResult.Succeeded) { Data = contribution };
             }
             catch (Exception exc)
             {
@@ -81,7 +93,24 @@ namespace GamaEdtech.Application.Service
             }
         }
 
-        public async Task<ResultData<long>> ManageContributionAsync([NotNull] ManageContributionRequestDto requestDto)
+        public async Task<ResultData<T?>> GetContributionDataAsync<T>([NotNull] ISpecification<Contribution> specification)
+        {
+            try
+            {
+                var uow = UnitOfWorkProvider.Value.CreateUnitOfWork();
+                var data = await uow.GetRepository<Contribution>().GetManyQueryable(specification)
+                    .Select(t => t.Data).FirstOrDefaultAsync();
+
+                return new(OperationResult.Succeeded) { Data = string.IsNullOrEmpty(data) ? default : JsonSerializer.Deserialize<T>(data) };
+            }
+            catch (Exception exc)
+            {
+                Logger.Value.LogException(exc);
+                return new(OperationResult.Failed) { Errors = [new() { Message = exc.Message },] };
+            }
+        }
+
+        public async Task<ResultData<long>> ManageContributionAsync<T>([NotNull] ManageContributionRequestDto<T> requestDto)
         {
             try
             {
@@ -102,9 +131,32 @@ namespace GamaEdtech.Application.Service
 
                     contribution.Comment = requestDto.Comment;
                     contribution.CategoryType = requestDto.CategoryType;
-                    contribution.Data = requestDto.Data;
                     contribution.IdentifierId = requestDto.IdentifierId;
                     contribution.Status = requestDto.Status;
+                    if (string.IsNullOrEmpty(contribution.Data))
+                    {
+                        contribution.Data = JsonSerializer.Serialize(requestDto.Data);
+                    }
+                    else
+                    {
+                        var dto = JsonSerializer.Deserialize<T>(contribution.Data);
+                        var properties = typeof(T).GetProperties();
+                        for (var i = 0; i < properties.Length; i++)
+                        {
+                            var property = properties[i];
+                            if (property.CanWrite)
+                            {
+                                continue;
+                            }
+
+                            var value = property.GetValue(requestDto.Data);
+                            if (value is not null)
+                            {
+                                property.SetValue(dto, value);
+                            }
+                        }
+                        contribution.Data = JsonSerializer.Serialize(dto);
+                    }
 
                     _ = repository.Update(contribution);
                 }
@@ -114,7 +166,7 @@ namespace GamaEdtech.Application.Service
                     {
                         Comment = requestDto.Comment,
                         CategoryType = requestDto.CategoryType,
-                        Data = requestDto.Data,
+                        Data = JsonSerializer.Serialize(requestDto.Data),
                         IdentifierId = requestDto.IdentifierId,
                         Status = requestDto.Status,
                     };
@@ -148,7 +200,7 @@ namespace GamaEdtech.Application.Service
             }
         }
 
-        public async Task<ResultData<ContributionDto>> ConfirmContributionAsync([NotNull] ISpecification<Contribution> specification)
+        public async Task<ResultData<ContributionDto<T>>> ConfirmContributionAsync<T>([NotNull] ISpecification<Contribution> specification)
         {
             try
             {
@@ -181,10 +233,10 @@ namespace GamaEdtech.Application.Service
 
                 return new(OperationResult.Succeeded)
                 {
-                    Data = new ContributionDto
+                    Data = new ContributionDto<T>
                     {
                         Id = contribution.Id,
-                        Data = contribution.Data,
+                        Data = string.IsNullOrEmpty(contribution.Data) ? default : JsonSerializer.Deserialize<T>(contribution.Data),
                         Comment = contribution.Comment,
                         CreationUserId = contribution.CreationUserId,
                         CreationDate = contribution.CreationDate,

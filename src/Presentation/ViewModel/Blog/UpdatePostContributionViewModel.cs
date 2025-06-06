@@ -9,37 +9,30 @@ namespace GamaEdtech.Presentation.ViewModel.Blog
 
     using Microsoft.AspNetCore.Http;
 
-    public sealed class PostContributionViewModel
+    public sealed class UpdatePostContributionViewModel
     {
         [Display]
-        [Required]
         public string? Title { get; set; }
 
         [Display]
-        [Required]
         public string? Slug { get; set; }
 
         [Display]
-        [Required]
         public string? Summary { get; set; }
 
         [Display]
-        [Required]
         public string? Body { get; set; }
 
         [Display]
-        [Required]
         [FileSize(1024 * 1024 * 2)]//2MB
         [FileExtensions(Constants.ValidImageExtensions)]
         public IFormFile? Image { get; set; }
 
         [Display]
-        [Required]
         [JsonConverter(typeof(EnumerationConverter<VisibilityType, byte>))]
         public VisibilityType? VisibilityType { get; set; }
 
         [Display]
-        [Required]
         public DateTimeOffset? PublishDate { get; set; }
 
         [Display]

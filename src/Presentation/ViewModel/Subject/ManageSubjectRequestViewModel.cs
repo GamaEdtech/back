@@ -10,6 +10,6 @@ namespace GamaEdtech.Presentation.ViewModel.Subject
 
         [Display]
         [Required]
-        public int Order { get; set; }
+        public int? Order { get; set; }
     }
 }

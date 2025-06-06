@@ -71,11 +71,18 @@ namespace GamaEdtech.Presentation.Api.Controllers
         }
 
         [HttpPost, Produces<ApiResponse<ManageVotingPowerResponseViewModel>>()]
-        public async Task<IActionResult<ManageVotingPowerResponseViewModel>> CreateVotingPower([NotNull, FromBody] ManageVotingPowerRequestViewModel request)
+        public async Task<IActionResult<ManageVotingPowerResponseViewModel>> CreateVotingPower([NotNull, FromBody] CreateVotingPowerRequestViewModel request)
         {
             try
             {
-                var result = await votingPowerService.Value.ManageVotingPowerAsync(MapTo(request, null));
+                ManageVotingPowerRequestDto dto = new()
+                {
+                    Amount = request.Amount.GetValueOrDefault(),
+                    WalletAddress = request.WalletAddress,
+                    TokenAccount = request.TokenAccount,
+                    ProposalId = request.ProposalId,
+                };
+                var result = await votingPowerService.Value.ManageVotingPowerAsync(dto);
 
                 return Ok<ManageVotingPowerResponseViewModel>(new(result.Errors)
                 {
@@ -91,11 +98,19 @@ namespace GamaEdtech.Presentation.Api.Controllers
         }
 
         [HttpPut("{id:long}"), Produces<ApiResponse<ManageVotingPowerResponseViewModel>>()]
-        public async Task<IActionResult<ManageVotingPowerResponseViewModel>> UpdateVotingPower([FromRoute] long id, [NotNull, FromBody] ManageVotingPowerRequestViewModel request)
+        public async Task<IActionResult<ManageVotingPowerResponseViewModel>> UpdateVotingPower([FromRoute] long id, [NotNull, FromBody] UpdateVotingPowerRequestViewModel request)
         {
             try
             {
-                var result = await votingPowerService.Value.ManageVotingPowerAsync(MapTo(request, id));
+                ManageVotingPowerRequestDto dto = new()
+                {
+                    Id = id,
+                    Amount = request.Amount.GetValueOrDefault(),
+                    WalletAddress = request.WalletAddress,
+                    TokenAccount = request.TokenAccount,
+                    ProposalId = request.ProposalId,
+                };
+                var result = await votingPowerService.Value.ManageVotingPowerAsync(dto);
 
                 return Ok<ManageVotingPowerResponseViewModel>(new(result.Errors)
                 {
@@ -109,14 +124,5 @@ namespace GamaEdtech.Presentation.Api.Controllers
                 return Ok<ManageVotingPowerResponseViewModel>(new() { Errors = [new() { Message = exc.Message }] });
             }
         }
-
-        private static ManageVotingPowerRequestDto MapTo(ManageVotingPowerRequestViewModel request, long? id) => new()
-        {
-            Id = id,
-            Amount = request.Amount.GetValueOrDefault(),
-            WalletAddress = request.WalletAddress,
-            TokenAccount = request.TokenAccount,
-            ProposalId = request.ProposalId,
-        };
     }
 }

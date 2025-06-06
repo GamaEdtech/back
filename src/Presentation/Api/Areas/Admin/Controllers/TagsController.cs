@@ -91,9 +91,9 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
             {
                 var result = await tagService.Value.ManageTagAsync(new ManageTagRequestDto
                 {
-                    Name = request.Name!,
+                    Name = request.Name,
                     Icon = request.Icon,
-                    TagType = request.TagType!,
+                    TagType = request.TagType,
                 });
                 return Ok(new ApiResponse<ManageTagResponseViewModel>
                 {
@@ -110,16 +110,16 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
         }
 
         [HttpPut("{id:long}"), Produces<ApiResponse<ManageTagResponseViewModel>>()]
-        public async Task<IActionResult> UpdateTag([FromRoute] long id, [NotNull, FromBody] ManageTagRequestViewModel request)
+        public async Task<IActionResult> UpdateTag([FromRoute] long id, [NotNull, FromBody] UpdateTagRequestViewModel request)
         {
             try
             {
                 var result = await tagService.Value.ManageTagAsync(new ManageTagRequestDto
                 {
                     Id = id,
-                    Name = request.Name!,
+                    Name = request.Name,
                     Icon = request.Icon,
-                    TagType = request.TagType!,
+                    TagType = request.TagType,
                 });
                 return Ok(new ApiResponse<ManageTagResponseViewModel>
                 {

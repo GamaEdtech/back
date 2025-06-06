@@ -1,7 +1,6 @@
 namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
 {
     using System.Diagnostics.CodeAnalysis;
-    using System.Text.Json;
 
     using Asp.Versioning;
 
@@ -75,22 +74,23 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
             {
                 var specification = new IdEqualsSpecification<Contribution, long>(contributionId)
                     .And(new CategoryTypeEqualsSpecification<Contribution>(CategoryType.Post));
-                var contributionResult = await contributionService.Value.GetContributionAsync(specification);
+                var contributionResult = await contributionService.Value.GetContributionAsync<PostContributionDto>(specification);
                 if (contributionResult.Data?.Data is null)
                 {
                     return Ok(new ApiResponse<PostContributionResponseViewModel>(contributionResult.Errors));
                 }
 
-                var dto = JsonSerializer.Deserialize<PostContributionDto>(contributionResult.Data.Data)!;
                 PostContributionResponseViewModel result = new()
                 {
-                    Title = dto.Title,
-                    Summary = dto.Summary,
-                    Body = dto.Body,
-                    ImageUri = fileService.Value.GetFileUri(dto.ImageId, ContainerType.Post).Data,
-                    Tags = dto.Tags,
-                    PublishDate = dto.PublishDate,
-                    VisibilityType = dto.VisibilityType,
+                    Title = contributionResult.Data.Data!.Title,
+                    Summary = contributionResult.Data.Data!.Summary,
+                    Body = contributionResult.Data.Data!.Body,
+                    ImageUri = fileService.Value.GetFileUri(contributionResult.Data.Data!.ImageId, ContainerType.Post).Data,
+                    Tags = contributionResult.Data.Data!.Tags,
+                    PublishDate = contributionResult.Data.Data!.PublishDate.GetValueOrDefault(),
+                    VisibilityType = contributionResult.Data.Data!.VisibilityType!,
+                    Keywords = contributionResult.Data.Data!.Keywords,
+                    Slug = contributionResult.Data.Data!.Slug,
                 };
 
                 return Ok(new ApiResponse<PostContributionResponseViewModel>
@@ -107,7 +107,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
         }
 
         [HttpPatch("contributions/{contributionId:long}/confirm"), Produces<ApiResponse<bool>>()]
-        public async Task<IActionResult> ConfirmSchoolImageContribution([FromRoute] long contributionId)
+        public async Task<IActionResult> ConfirmPostContribution([FromRoute] long contributionId)
         {
             try
             {
@@ -130,7 +130,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
         }
 
         [HttpPatch("contributions/{contributionId:long}/reject"), Produces<ApiResponse<bool>>()]
-        public async Task<IActionResult> RejectSchoolImageContribution([FromRoute] long contributionId, [NotNull, FromBody] RejectContributionRequestViewModel request)
+        public async Task<IActionResult> RejectPostContribution([FromRoute] long contributionId, [NotNull, FromBody] RejectContributionRequestViewModel request)
         {
             try
             {

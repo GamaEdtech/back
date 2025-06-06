@@ -4,11 +4,11 @@ namespace GamaEdtech.Data.Dto.Contribution
 
     using GamaEdtech.Domain.Enumeration;
 
-    public sealed class ContributionDto
+    public sealed class ContributionDto<T>
     {
         public long Id { get; set; }
         public string? Comment { get; set; }
-        public string? Data { get; set; }
+        public T? Data { get; set; }
         public long? IdentifierId { get; set; }
         public CategoryType? CategoryType { get; set; }
         public int CreationUserId { get; set; }

@@ -453,13 +453,12 @@ namespace GamaEdtech.Presentation.Api.Controllers
                     .And(new IdentifierIdEqualsSpecification<Contribution>(schoolId))
                     .And(new CreationUserIdEqualsSpecification<Contribution, ApplicationUser, int>(User.UserId()))
                     .And(new CategoryTypeEqualsSpecification<Contribution>(CategoryType.School));
-                var result = await contributionService.Value.GetContributionAsync(specification);
+                var result = await contributionService.Value.GetContributionAsync<SchoolContributionDto>(specification);
 
                 SchoolContributionViewModel? viewModel = null;
                 if (result.Data?.Data is not null)
                 {
-                    var dto = JsonSerializer.Deserialize<SchoolContributionDto>(result.Data.Data);
-                    viewModel = MapFrom(dto);
+                    viewModel = MapFrom(result.Data.Data);
                 }
 
                 return Ok<SchoolContributionViewModel>(new(result.Errors)
@@ -485,24 +484,27 @@ namespace GamaEdtech.Presentation.Api.Controllers
                 {
                     UserId = User.UserId(),
                     SchoolId = schoolId,
-                    Address = request.Address,
-                    CityId = request.CityId,
-                    CountryId = request.CountryId,
-                    Email = request.Email,
-                    FaxNumber = request.FaxNumber,
-                    Latitude = request.Latitude,
-                    LocalAddress = request.LocalAddress,
-                    LocalName = request.LocalName,
-                    Longitude = request.Longitude,
-                    Name = request.Name,
-                    PhoneNumber = request.PhoneNumber,
-                    Quarter = request.Quarter,
-                    SchoolType = request.SchoolType,
-                    StateId = request.StateId,
-                    WebSite = request.WebSite,
-                    ZipCode = request.ZipCode,
-                    Tags = request.Tags,
-                    DefaultImageId = request.DefaultImageId,
+                    SchoolContribution = new()
+                    {
+                        Address = request.Address,
+                        CityId = request.CityId,
+                        CountryId = request.CountryId,
+                        Email = request.Email,
+                        FaxNumber = request.FaxNumber,
+                        Latitude = request.Latitude,
+                        LocalAddress = request.LocalAddress,
+                        LocalName = request.LocalName,
+                        Longitude = request.Longitude,
+                        Name = request.Name,
+                        PhoneNumber = request.PhoneNumber,
+                        Quarter = request.Quarter,
+                        SchoolType = request.SchoolType,
+                        StateId = request.StateId,
+                        WebSite = request.WebSite,
+                        ZipCode = request.ZipCode,
+                        Tags = request.Tags,
+                        DefaultImageId = request.DefaultImageId,
+                    },
                 });
 
                 return Ok<ManageSchoolContributionResponseViewModel>(new(result.Errors)
@@ -529,24 +531,27 @@ namespace GamaEdtech.Presentation.Api.Controllers
                     Id = contributionId,
                     UserId = User.UserId(),
                     SchoolId = schoolId,
-                    Address = request.Address,
-                    CityId = request.CityId,
-                    CountryId = request.CountryId,
-                    Email = request.Email,
-                    FaxNumber = request.FaxNumber,
-                    Latitude = request.Latitude,
-                    LocalAddress = request.LocalAddress,
-                    LocalName = request.LocalName,
-                    Longitude = request.Longitude,
-                    Name = request.Name,
-                    PhoneNumber = request.PhoneNumber,
-                    Quarter = request.Quarter,
-                    SchoolType = request.SchoolType,
-                    StateId = request.StateId,
-                    WebSite = request.WebSite,
-                    ZipCode = request.ZipCode,
-                    Tags = request.Tags,
-                    DefaultImageId = request.DefaultImageId,
+                    SchoolContribution = new()
+                    {
+                        Address = request.Address,
+                        CityId = request.CityId,
+                        CountryId = request.CountryId,
+                        Email = request.Email,
+                        FaxNumber = request.FaxNumber,
+                        Latitude = request.Latitude,
+                        LocalAddress = request.LocalAddress,
+                        LocalName = request.LocalName,
+                        Longitude = request.Longitude,
+                        Name = request.Name,
+                        PhoneNumber = request.PhoneNumber,
+                        Quarter = request.Quarter,
+                        SchoolType = request.SchoolType,
+                        StateId = request.StateId,
+                        WebSite = request.WebSite,
+                        ZipCode = request.ZipCode,
+                        Tags = request.Tags,
+                        DefaultImageId = request.DefaultImageId,
+                    },
                 });
 
                 return Ok<ManageSchoolContributionResponseViewModel>(new(result.Errors)
@@ -571,23 +576,26 @@ namespace GamaEdtech.Presentation.Api.Controllers
                 var result = await schoolService.Value.ManageSchoolContributionAsync(new ManageSchoolContributionRequestDto
                 {
                     UserId = User.UserId(),
-                    Address = request.Address,
-                    CityId = request.CityId,
-                    CountryId = request.CountryId,
-                    Email = request.Email,
-                    FaxNumber = request.FaxNumber,
-                    Latitude = request.Latitude,
-                    LocalAddress = request.LocalAddress,
-                    LocalName = request.LocalName,
-                    Longitude = request.Longitude,
-                    Name = request.Name,
-                    PhoneNumber = request.PhoneNumber,
-                    Quarter = request.Quarter,
-                    SchoolType = request.SchoolType,
-                    StateId = request.StateId,
-                    WebSite = request.WebSite,
-                    ZipCode = request.ZipCode,
-                    Tags = request.Tags,
+                    SchoolContribution = new()
+                    {
+                        Address = request.Address,
+                        CityId = request.CityId,
+                        CountryId = request.CountryId,
+                        Email = request.Email,
+                        FaxNumber = request.FaxNumber,
+                        Latitude = request.Latitude,
+                        LocalAddress = request.LocalAddress,
+                        LocalName = request.LocalName,
+                        Longitude = request.Longitude,
+                        Name = request.Name,
+                        PhoneNumber = request.PhoneNumber,
+                        Quarter = request.Quarter,
+                        SchoolType = request.SchoolType,
+                        StateId = request.StateId,
+                        WebSite = request.WebSite,
+                        ZipCode = request.ZipCode,
+                        Tags = request.Tags,
+                    },
                 });
 
                 return Ok<ManageSchoolContributionResponseViewModel>(new(result.Errors)

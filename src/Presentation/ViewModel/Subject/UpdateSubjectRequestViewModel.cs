@@ -1,15 +1,13 @@
-namespace GamaEdtech.Presentation.ViewModel.Topic
+namespace GamaEdtech.Presentation.ViewModel.Subject
 {
     using GamaEdtech.Common.DataAnnotation;
 
-    public sealed class ManageTopicRequestViewModel
+    public sealed class UpdateSubjectRequestViewModel
     {
         [Display]
-        [Required]
         public string? Title { get; set; }
 
         [Display]
-        [Required]
         public int? Order { get; set; }
     }
 }
