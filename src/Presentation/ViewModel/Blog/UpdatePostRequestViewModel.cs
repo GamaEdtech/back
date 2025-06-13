@@ -9,7 +9,7 @@ namespace GamaEdtech.Presentation.ViewModel.Blog
 
     using Microsoft.AspNetCore.Http;
 
-    public sealed class UpdatePostContributionViewModel
+    public sealed class UpdatePostRequestViewModel
     {
         [Display]
         public string? Title { get; set; }
@@ -40,8 +40,5 @@ namespace GamaEdtech.Presentation.ViewModel.Blog
 
         [Display]
         public IEnumerable<long>? Tags { get; set; }
-
-        [Display]
-        public bool? Draft { get; set; }
     }
 }

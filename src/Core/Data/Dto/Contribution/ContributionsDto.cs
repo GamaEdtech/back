@@ -4,7 +4,7 @@ namespace GamaEdtech.Data.Dto.Contribution
 
     using GamaEdtech.Domain.Enumeration;
 
-    public sealed class ContributionsDto
+    public sealed class ContributionsDto<T>
     {
         public long Id { get; set; }
         public string? Comment { get; set; }
@@ -13,7 +13,7 @@ namespace GamaEdtech.Data.Dto.Contribution
         public long? IdentifierId { get; set; }
         public string? CreationUser { get; set; }
         public DateTimeOffset CreationDate { get; set; }
-        public string? Data { get; set; }
+        public T? Data { get; set; }
         public DateTimeOffset? LastModifyDate { get; set; }
     }
 }

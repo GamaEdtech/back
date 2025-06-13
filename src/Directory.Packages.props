@@ -6,6 +6,7 @@
     </PackageReference>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <PackageVersion Include="BouncyCastle.Cryptography" Version="2.6.1" />
     <PackageVersion Include="Hangfire.AspNetCore" Version="1.8.20" />
     <PackageVersion Include="Hangfire.SqlServer" Version="1.8.20" />
     <PackageVersion Include="MetadataExtractor" Version="2.8.1" />

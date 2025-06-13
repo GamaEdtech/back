@@ -51,6 +51,8 @@ namespace GamaEdtech.Common.DataAccess.Repositories
 
         void Add(TEntity entity);
 
+        void AddRange(IEnumerable<TEntity> entities);
+
         TEntity? Update(TEntity entity);
 
         void Remove(TEntity entity);

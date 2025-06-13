@@ -1,7 +1,6 @@
 namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
 {
     using System.Diagnostics.CodeAnalysis;
-    using System.Text.Json;
 
     using Asp.Versioning;
 
@@ -214,7 +213,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
         #region Comments
 
         [HttpGet("comments/contributions"), Produces<ApiResponse<ListDataSource<SchoolCommentContributionListResponseViewModel>>>()]
-        public async Task<IActionResult<ListDataSource<SchoolCommentContributionListResponseViewModel>>> GetPendingSchoolCommentContributionList([NotNull, FromQuery] SchoolCommentContributionListRequestViewModel request)
+        public async Task<IActionResult<ListDataSource<SchoolCommentContributionListResponseViewModel>>> GetSchoolCommentContributionList([NotNull, FromQuery] SchoolCommentContributionListRequestViewModel request)
         {
             try
             {
@@ -223,7 +222,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
                 {
                     specification = specification.And(new StatusEqualsSpecification<Contribution>(request.Status));
                 }
-                var result = await contributionService.Value.GetContributionsAsync(new ListRequestDto<Contribution>
+                var result = await contributionService.Value.GetContributionsAsync<SchoolCommentContributionDto>(new ListRequestDto<Contribution>
                 {
                     PagingDto = request.PagingDto,
                     Specification = specification,
@@ -353,7 +352,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
         #region Images
 
         [HttpGet("images/contributions"), Produces<ApiResponse<ListDataSource<SchoolImageContributionListResponseViewModel>>>()]
-        public async Task<IActionResult<ListDataSource<SchoolImageContributionListResponseViewModel>>> GetPendingSchoolImageContributionList([NotNull, FromQuery] SchoolImageContributionListRequestViewModel request)
+        public async Task<IActionResult<ListDataSource<SchoolImageContributionListResponseViewModel>>> GetSchoolImageContributionList([NotNull, FromQuery] SchoolImageContributionListRequestViewModel request)
         {
             try
             {
@@ -362,7 +361,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
                 {
                     specification = specification.And(new StatusEqualsSpecification<Contribution>(request.Status));
                 }
-                var result = await contributionService.Value.GetContributionsAsync(new ListRequestDto<Contribution>
+                var result = await contributionService.Value.GetContributionsAsync<SchoolImageContributionDto>(new ListRequestDto<Contribution>
                 {
                     PagingDto = request.PagingDto,
                     Specification = specification,
@@ -373,7 +372,6 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
                 {
                     foreach (var item in result.Data.List)
                     {
-                        var dto = JsonSerializer.Deserialize<SchoolImageContributionDto>(item.Data!);
                         lst.Add(new SchoolImageContributionListResponseViewModel
                         {
                             Id = item.Id,
@@ -381,9 +379,9 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
                             CreationDate = item.CreationDate,
                             SchoolId = item.IdentifierId.GetValueOrDefault(),
                             Status = item.Status,
-                            FileUri = fileService.Value.GetFileUri(dto?.FileId, ContainerType.School).Data,
-                            FileType = dto?.FileType,
-                            IsDefault = dto?.IsDefault ?? false,
+                            FileUri = fileService.Value.GetFileUri(item.Data?.FileId, ContainerType.School).Data,
+                            FileType = item.Data?.FileType,
+                            IsDefault = item.Data?.IsDefault ?? false,
                         });
                     }
                 }
@@ -563,7 +561,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
                     specification = specification.And(new StatusEqualsSpecification<Contribution>(request.Status));
                 }
 
-                var result = await contributionService.Value.GetContributionsAsync(new ListRequestDto<Contribution>
+                var result = await contributionService.Value.GetContributionsAsync<SchoolContributionDto>(new ListRequestDto<Contribution>
                 {
                     PagingDto = request.PagingDto,
                     Specification = specification,
@@ -695,11 +693,11 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
                     specification = specification.And(new StatusEqualsSpecification<Contribution>(request.Status));
                 }
 
-                var result = await contributionService.Value.GetContributionsAsync(new ListRequestDto<Contribution>
+                var result = await contributionService.Value.GetContributionsAsync<string>(new ListRequestDto<Contribution>
                 {
                     PagingDto = request.PagingDto,
                     Specification = specification,
-                }, true);
+                }, false);
                 if (result.Data.List is null)
                 {
                     return Ok<ListDataSource<SchoolIssuesContributionReviewResponseViewModel>>(new(result.Errors)

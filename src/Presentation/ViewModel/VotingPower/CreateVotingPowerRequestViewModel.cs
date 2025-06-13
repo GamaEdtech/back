@@ -6,18 +6,18 @@ namespace GamaEdtech.Presentation.ViewModel.VotingPower
     {
         [Display]
         [Required]
-        public string? ProposalId { get; set; }
+        public IEnumerable<VotingPowerViewModel> Data { get; set; }
 
         [Display]
         [Required]
-        public string? WalletAddress { get; set; }
+        public string? PublicKey { get; set; }
 
         [Display]
         [Required]
-        public decimal? Amount { get; set; }
+        public string? Message { get; set; }
 
         [Display]
         [Required]
-        public string? TokenAccount { get; set; }
+        public string? SignedMessage { get; set; }
     }
 }

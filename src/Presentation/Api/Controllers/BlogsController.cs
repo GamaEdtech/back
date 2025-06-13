@@ -250,12 +250,12 @@ namespace GamaEdtech.Presentation.Api.Controllers
         {
             try
             {
-                var result = await contributionService.Value.GetContributionsAsync(new ListRequestDto<Contribution>
+                var result = await contributionService.Value.GetContributionsAsync<PostContributionDto>(new ListRequestDto<Contribution>
                 {
                     PagingDto = request.PagingDto,
                     Specification = new CreationUserIdEqualsSpecification<Contribution, ApplicationUser, int>(User.UserId())
                         .And(new CategoryTypeEqualsSpecification<Contribution>(CategoryType.Post)),
-                });
+                }, true);
                 return Ok<ListDataSource<PostContributionListResponseViewModel>>(new(result.Errors)
                 {
                     Data = result.Data.List is null ? new() : new()
@@ -267,6 +267,7 @@ namespace GamaEdtech.Presentation.Api.Controllers
                             Status = t.Status,
                             CreationUser = t.CreationUser,
                             CreationDate = t.CreationDate,
+                            Title = t.Data?.Title,
                         }),
                         TotalRecordsCount = result.Data.TotalRecordsCount,
                     }
@@ -341,6 +342,7 @@ namespace GamaEdtech.Presentation.Api.Controllers
                     PublishDate = request.PublishDate.GetValueOrDefault(),
                     VisibilityType = request.VisibilityType!,
                     Keywords = request.Keywords,
+                    Draft = request.Draft,
                 };
                 var result = await blogService.Value.ManagePostContributionAsync(dto);
 
@@ -382,6 +384,7 @@ namespace GamaEdtech.Presentation.Api.Controllers
                     PublishDate = request.PublishDate,
                     VisibilityType = request.VisibilityType,
                     Keywords = request.Keywords,
+                    Draft = request.Draft,
                 };
                 var result = await blogService.Value.ManagePostContributionAsync(dto);
 

@@ -18,5 +18,7 @@ namespace GamaEdtech.Presentation.ViewModel.Blog
         public string? CreationUser { get; set; }
 
         public DateTimeOffset CreationDate { get; set; }
+
+        public string? Title { get; set; }
     }
 }

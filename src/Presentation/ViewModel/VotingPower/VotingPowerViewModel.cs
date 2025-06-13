@@ -1,11 +1,23 @@
 namespace GamaEdtech.Presentation.ViewModel.VotingPower
 {
-    public sealed class VotingPowersResponseViewModel
+    using GamaEdtech.Common.DataAnnotation;
+
+    public sealed class VotingPowerViewModel
     {
-        public long Id { get; set; }
+        [Display]
+        [Required]
         public string? ProposalId { get; set; }
+
+        [Display]
+        [Required]
         public string? WalletAddress { get; set; }
+
+        [Display]
+        [Required]
         public decimal? Amount { get; set; }
+
+        [Display]
+        [Required]
         public string? TokenAccount { get; set; }
     }
 }

@@ -402,7 +402,7 @@ namespace GamaEdtech.Presentation.Api.Controllers
         {
             try
             {
-                var result = await contributionService.Value.GetContributionsAsync(new ListRequestDto<Contribution>
+                var result = await contributionService.Value.GetContributionsAsync<SchoolContributionDto>(new ListRequestDto<Contribution>
                 {
                     PagingDto = request.PagingDto,
                     Specification = new IdentifierIdEqualsSpecification<Contribution>(schoolId)
@@ -621,13 +621,13 @@ namespace GamaEdtech.Presentation.Api.Controllers
         {
             try
             {
-                var result = await contributionService.Value.GetContributionsAsync(new ListRequestDto<Contribution>
+                var result = await contributionService.Value.GetContributionsAsync<string>(new ListRequestDto<Contribution>
                 {
                     PagingDto = request.PagingDto,
                     Specification = new IdentifierIdEqualsSpecification<Contribution>(schoolId)
                         .And(new CreationUserIdEqualsSpecification<Contribution, ApplicationUser, int>(User.UserId()))
                         .And(new CategoryTypeEqualsSpecification<Contribution>(CategoryType.SchoolIssues)),
-                }, true);
+                }, false);
 
                 if (result.Data.List is null)
                 {

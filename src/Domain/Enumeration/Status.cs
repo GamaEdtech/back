@@ -9,13 +9,16 @@ namespace GamaEdtech.Domain.Enumeration
         public static readonly Status Draft = new(nameof(Draft), 0);
 
         [Display]
-        public static readonly Status Confirmed = new(nameof(Confirmed), 1);
+        public static readonly Status Review = new(nameof(Review), 1);
 
         [Display]
-        public static readonly Status Rejected = new(nameof(Rejected), 2);
+        public static readonly Status Confirmed = new(nameof(Confirmed), 2);
 
         [Display]
-        public static readonly Status Deleted = new(nameof(Deleted), 3);
+        public static readonly Status Rejected = new(nameof(Rejected), 3);
+
+        [Display]
+        public static readonly Status Deleted = new(nameof(Deleted), 4);
 
         public Status()
         {

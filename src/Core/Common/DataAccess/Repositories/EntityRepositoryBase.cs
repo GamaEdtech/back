@@ -107,6 +107,13 @@ namespace GamaEdtech.Common.DataAccess.Repositories
             _ = Context!.Set<TEntity>().Add(entity);
         }
 
+        public void AddRange(IEnumerable<TEntity> entities)
+        {
+            ArgumentNullException.ThrowIfNull(entities);
+
+            Context!.Set<TEntity>().AddRange(entities);
+        }
+
         public TEntity? Update(TEntity entity)
         {
             ArgumentNullException.ThrowIfNull(entity);

@@ -29,7 +29,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
         : ApiControllerBase<BlogsController>(logger)
     {
         [HttpGet("contributions"), Produces<ApiResponse<ListDataSource<PostContributionListResponseViewModel>>>()]
-        public async Task<IActionResult<ListDataSource<PostContributionListResponseViewModel>>> GetPendingPostContributionList([NotNull, FromQuery] PostContributionListRequestViewModel request)
+        public async Task<IActionResult<ListDataSource<PostContributionListResponseViewModel>>> GetPostContributionList([NotNull, FromQuery] PostContributionListRequestViewModel request)
         {
             try
             {
@@ -39,7 +39,7 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
                     specification = specification.And(new StatusEqualsSpecification<Contribution>(request.Status));
                 }
 
-                var result = await contributionService.Value.GetContributionsAsync(new ListRequestDto<Contribution>
+                var result = await contributionService.Value.GetContributionsAsync<PostContributionDto>(new ListRequestDto<Contribution>
                 {
                     PagingDto = request.PagingDto,
                     Specification = specification,
@@ -149,6 +149,39 @@ namespace GamaEdtech.Presentation.Api.Areas.Admin.Controllers
                 Logger.Value.LogException(exc);
 
                 return Ok(new ApiResponse<bool> { Errors = [new() { Message = exc.Message }] });
+            }
+        }
+
+        [HttpPut("posts/{postId:long}"), Produces<ApiResponse<ManagePostResponseViewModel>>()]
+        public async Task<IActionResult<ManagePostResponseViewModel>> UpdatePost([FromRoute] long postId, [NotNull, FromBody] UpdatePostRequestViewModel request)
+        {
+            try
+            {
+                ManagePostRequestDto dto = new()
+                {
+                    Id = postId,
+                    Body = request.Body,
+                    Image = request.Image,
+                    Keywords = request.Keywords,
+                    PublishDate = request.PublishDate,
+                    Slug = request.Slug,
+                    Summary = request.Summary,
+                    Tags = request.Tags,
+                    Title = request.Title,
+                    VisibilityType = request.VisibilityType,
+                };
+                var result = await blogService.Value.ManagePostAsync(dto);
+
+                return Ok<ManagePostResponseViewModel>(new(result.Errors)
+                {
+                    Data = new() { Id = result.Data, },
+                });
+            }
+            catch (Exception exc)
+            {
+                Logger.Value.LogException(exc);
+
+                return Ok<ManagePostResponseViewModel>(new() { Errors = [new() { Message = exc.Message }] });
             }
         }
 

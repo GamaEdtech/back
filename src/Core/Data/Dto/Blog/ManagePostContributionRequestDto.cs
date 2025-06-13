@@ -19,5 +19,6 @@ namespace GamaEdtech.Data.Dto.Blog
         public IFormFile? Image { get; set; }
         public IEnumerable<long>? Tags { get; set; }
         public string? Keywords { get; set; }
+        public bool? Draft { get; set; }
     }
 }

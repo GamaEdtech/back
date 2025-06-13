@@ -27,25 +27,39 @@ namespace GamaEdtech.Application.Service
         , Lazy<ILogger<ContributionService>> logger, Lazy<IApplicationSettingsService> applicationSettingsService, Lazy<ITransactionService> transactionService)
         : LocalizableServiceBase<ContributionService>(unitOfWorkProvider, httpContextAccessor, localizer, logger), IContributionService
     {
-        public async Task<ResultData<ListDataSource<ContributionsDto>>> GetContributionsAsync(ListRequestDto<Contribution>? requestDto = null, bool includeData = false)
+        public async Task<ResultData<ListDataSource<ContributionsDto<T>>>> GetContributionsAsync<T>(ListRequestDto<Contribution>? requestDto = null, bool includeData = false)
         {
             try
             {
                 var uow = UnitOfWorkProvider.Value.CreateUnitOfWork();
-                var result = await uow.GetRepository<Contribution>().GetManyQueryable(requestDto?.Specification).FilterListAsync(requestDto?.PagingDto);
-                var users = await result.List.Select(t => new ContributionsDto
+                var query = await uow.GetRepository<Contribution>().GetManyQueryable(requestDto?.Specification).FilterListAsync(requestDto?.PagingDto);
+                var lst = await query.List.Select(t => new
                 {
-                    Id = t.Id,
-                    Comment = t.Comment,
-                    CategoryType = t.CategoryType,
-                    IdentifierId = t.IdentifierId,
-                    Status = t.Status,
+                    t.Id,
+                    t.Comment,
+                    t.CategoryType,
+                    t.IdentifierId,
+                    t.Status,
                     CreationUser = t.CreationUser!.FirstName + " " + t.CreationUser.LastName,
-                    CreationDate = t.CreationDate,
-                    LastModifyDate = t.LastModifyDate,
+                    t.CreationDate,
+                    t.LastModifyDate,
                     Data = includeData ? t.Data : null,
                 }).ToListAsync();
-                return new(OperationResult.Succeeded) { Data = new() { List = users, TotalRecordsCount = result.TotalRecordsCount } };
+
+                var result = lst.Select(t => new ContributionsDto<T>
+                {
+                    Id = t.Id,
+                    CategoryType = t.CategoryType,
+                    Comment = t.Comment,
+                    CreationDate = t.CreationDate,
+                    CreationUser = t.CreationUser,
+                    IdentifierId = t.IdentifierId,
+                    LastModifyDate = t.LastModifyDate,
+                    Status = t.Status,
+                    Data = string.IsNullOrEmpty(t.Data) ? default : JsonSerializer.Deserialize<T>(t.Data),
+                });
+
+                return new(OperationResult.Succeeded) { Data = new() { List = result, TotalRecordsCount = query.TotalRecordsCount } };
             }
             catch (Exception exc)
             {
@@ -206,7 +220,7 @@ namespace GamaEdtech.Application.Service
             {
                 var uow = UnitOfWorkProvider.Value.CreateUnitOfWork();
                 var repository = uow.GetRepository<Contribution>();
-                var contribution = await repository.GetAsync(specification);
+                var contribution = await repository.GetAsync(specification.And(new StatusEqualsSpecification<Contribution>(Status.Review)));
                 if (contribution is null)
                 {
                     return new(OperationResult.NotFound)
@@ -259,7 +273,7 @@ namespace GamaEdtech.Application.Service
                 var uow = UnitOfWorkProvider.Value.CreateUnitOfWork();
                 var repository = uow.GetRepository<Contribution>();
                 var userId = HttpContextAccessor.Value.HttpContext?.User.UserId();
-                var affectedRows = await repository.GetManyQueryable(t => t.Id == requestDto.Id).ExecuteUpdateAsync(t => t
+                var affectedRows = await repository.GetManyQueryable(t => t.Id == requestDto.Id && t.Status == Status.Review).ExecuteUpdateAsync(t => t
                     .SetProperty(p => p.Status, Status.Rejected)
                     .SetProperty(p => p.Comment, requestDto.Comment)
                     .SetProperty(p => p.LastModifyUserId, userId)

@@ -3,7 +3,6 @@ namespace GamaEdtech.Application.Service
     using System;
     using System.Diagnostics.CodeAnalysis;
     using System.Linq;
-    using System.Text.Json;
 
     using EntityFramework.Exceptions.Common;
 
@@ -550,7 +549,10 @@ namespace GamaEdtech.Application.Service
 
                 var contributionSpecification = new CreationUserIdEqualsSpecification<Contribution, ApplicationUser, int>(requestDto.CreationUserId)
                     .And(new IdentifierIdEqualsSpecification<Contribution>(requestDto.SchoolId))
-                    .And(new StatusEqualsSpecification<Contribution>(Status.Draft));
+                    .And(
+                        new StatusEqualsSpecification<Contribution>(Status.Draft)
+                        .Or(new StatusEqualsSpecification<Contribution>(Status.Review))
+                    );
                 var contributionExists = await contributionService.Value.ExistsContributionAsync(contributionSpecification);
                 if (contributionExists.Data)
                 {
@@ -578,7 +580,7 @@ namespace GamaEdtech.Application.Service
                 {
                     CategoryType = CategoryType.SchoolComment,
                     IdentifierId = requestDto.SchoolId,
-                    Status = Status.Draft,
+                    Status = Status.Review,
                     Data = dto,
                 });
                 if (contributionResult.OperationResult is not OperationResult.Succeeded)
@@ -789,7 +791,7 @@ namespace GamaEdtech.Application.Service
                 {
                     CategoryType = CategoryType.SchoolImage,
                     IdentifierId = requestDto.SchoolId,
-                    Status = Status.Draft,
+                    Status = Status.Review,
                     Data = dto,
                 });
                 if (contributionResult.OperationResult is not OperationResult.Succeeded)
@@ -1018,7 +1020,11 @@ namespace GamaEdtech.Application.Service
                     var specification = new IdEqualsSpecification<Contribution, long>(requestDto.Id.Value)
                         .And(new CreationUserIdEqualsSpecification<Contribution, ApplicationUser, int>(requestDto.UserId))
                         .And(new CategoryTypeEqualsSpecification<Contribution>(CategoryType.School))
-                        .And(new StatusEqualsSpecification<Contribution>(Status.Draft).Or(new StatusEqualsSpecification<Contribution>(Status.Rejected)));
+                        .And(
+                            new StatusEqualsSpecification<Contribution>(Status.Draft)
+                            .Or(new StatusEqualsSpecification<Contribution>(Status.Rejected))
+                            .Or(new StatusEqualsSpecification<Contribution>(Status.Review))
+                        );
                     if (requestDto.SchoolId.HasValue)
                     {
                         specification = specification.And(new IdentifierIdEqualsSpecification<Contribution>(requestDto.SchoolId.Value));
@@ -1035,7 +1041,7 @@ namespace GamaEdtech.Application.Service
                 {
                     CategoryType = CategoryType.School,
                     IdentifierId = requestDto.SchoolId,
-                    Status = Status.Draft,
+                    Status = Status.Review,
                     Data = requestDto.SchoolContribution,
                     Id = requestDto.Id,
                 });
@@ -1157,7 +1163,10 @@ namespace GamaEdtech.Application.Service
 
                 var contributionSpecification = new CreationUserIdEqualsSpecification<Contribution, ApplicationUser, int>(requestDto.CreationUserId)
                     .And(new IdentifierIdEqualsSpecification<Contribution>(requestDto.SchoolId))
-                    .And(new StatusEqualsSpecification<Contribution>(Status.Draft));
+                    .And(
+                        new StatusEqualsSpecification<Contribution>(Status.Draft)
+                        .Or(new StatusEqualsSpecification<Contribution>(Status.Review))
+                    );
                 var contributionExists = await contributionService.Value.ExistsContributionAsync(contributionSpecification);
                 if (contributionExists.Data)
                 {
@@ -1168,7 +1177,7 @@ namespace GamaEdtech.Application.Service
                 {
                     CategoryType = CategoryType.SchoolIssues,
                     IdentifierId = requestDto.SchoolId,
-                    Status = Status.Draft,
+                    Status = Status.Review,
                     Data = requestDto.Description,
                 });
                 if (contributionResult.OperationResult is not OperationResult.Succeeded)
@@ -1276,7 +1285,7 @@ namespace GamaEdtech.Application.Service
         {
             try
             {
-                var lst = await contributionService.Value.GetContributionsAsync(new()
+                var lst = await contributionService.Value.GetContributionsAsync<SchoolImageContributionDto>(new()
                 {
                     PagingDto = new() { PageFilter = new() { ReturnTotalRecordsCount = false, Size = 1000 } },
                     Specification = new CategoryTypeEqualsSpecification<Contribution>(CategoryType.SchoolImage)
@@ -1296,20 +1305,19 @@ namespace GamaEdtech.Application.Service
                         continue;
                     }
 
-                    var dto = JsonSerializer.Deserialize<SchoolImageContributionDto>(item.Data!);
-                    if (dto is null)
+                    if (item.Data is null)
                     {
                         continue;
                     }
 
                     var result = await fileService.Value.RemoveFileAsync(new()
                     {
-                        FileId = dto.FileId!,
+                        FileId = item.Data.FileId!,
                         ContainerType = ContainerType.School,
                     });
                     if (result.Data)
                     {
-                        _ = await contributionService.Value.ManageContributionAsync<string>(new()
+                        _ = await contributionService.Value.ManageContributionAsync<SchoolImageContributionDto>(new()
                         {
                             CategoryType = item.CategoryType!,
                             Id = item.Id,

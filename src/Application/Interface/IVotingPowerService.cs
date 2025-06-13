@@ -11,6 +11,6 @@ namespace GamaEdtech.Application.Interface
     public interface IVotingPowerService
     {
         Task<ResultData<ListDataSource<VotingPowerDto>>> GetVotingPowersAsync(ListRequestDto<VotingPower>? requestDto = null);
-        Task<ResultData<long>> ManageVotingPowerAsync([NotNull] ManageVotingPowerRequestDto requestDto);
+        Task<ResultData<bool>> BulkImportVotingPowersAsync([NotNull] IEnumerable<ManageVotingPowerRequestDto> requestDto);
     }
 }
