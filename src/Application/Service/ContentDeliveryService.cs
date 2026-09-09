@@ -107,6 +107,14 @@ namespace GamaEdtech.Application.Service
                 ContentType = requestDto.ContentType,
                 FileType = requestDto.FileType,
             });
+            if (priceStatus.Data?.LegacyAuthRejected == true)
+            {
+                // gama-api rejected the caller's own forwarded legacy token on this side-effect-free price
+                // lookup, before anything was ever charged - propagate so DownloadsController can turn it into
+                // a real HTTP 401, same as the two LegacyAuthRejected checks below (post-charge) already do.
+                return new(OperationResult.Succeeded) { Data = new() { LegacyAuthRejected = true, Spent = false } };
+            }
+
             if (priceStatus.OperationResult is not OperationResult.Succeeded || priceStatus.Data is null)
             {
                 return new(priceStatus.OperationResult) { Errors = priceStatus.Errors };
