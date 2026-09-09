@@ -284,6 +284,26 @@ downloads the same treatment, for the same failure shape:
 See `docs/api/endpoints.md`'s `DownloadsController` entry and `docs/business/identity-and-access.md`
 for the precedent this mirrors.
 
+### Gap in the above: the price-check call itself wasn't covered (fixed 2026-09-09)
+
+The 401 propagation above only covered `GetDownloadUrlAsync`. `DownloadWithPriceCheckAsync` (the
+PastPaper pdf/word/answer path) calls `GetContentPriceStatusAsync` **first**, before ever charging
+or calling `GetDownloadUrlAsync` - and that side-effect-free lookup (`GetTestPriceStatusAsync`/
+`GetFilePriceStatusAsync`/`GetExamPriceStatusAsync`) never checked the HTTP status at all. A legacy
+token already invalid at that point fell through to a generic `Failed` result instead, which
+`DownloadsController` still reports as the usual `200`/`succeeded:false` - the frontend's 401/403
+interceptor never fires, so the login dialog never reopens, and the user just sees a dead-end
+despite a perfectly healthy subscription/quota. Live-reported as "quota and subscription look fine
+but download just doesn't work."
+
+Fixed the same way as `GetDownloadUrlAsync`: all three `GetXxxPriceStatusAsync` methods now capture
+`legacyStatusCode` via `postCallHandler` and check it with the same shared `IsAuthRejection` helper
+(hoisted out of `GetDownloadUrlAsync` so all four methods use one copy), in both the normal-response
+path and the `catch` block. `GetContentPriceStatusResponseDto.LegacyAuthRejected` carries this up;
+`ContentDeliveryService.DownloadWithPriceCheckAsync` checks it immediately after the price-check
+call, before its existing `OperationResult`/`Data is null` guard, and returns `LegacyAuthRejected =
+true` straight away - nothing has been charged yet at this point, so unlike the two `GetDownloadUrlAsync`-triggered checks in this same method, no refund is needed here.
+
 ## Commission accrual
 
 Only runs when `OwnerExternalId` is reported **and** the downloader's charge above actually

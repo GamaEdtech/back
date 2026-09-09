@@ -114,9 +114,10 @@ namespace GamaEdtech.Infrastructure.Provider.ContentDelivery
                 Logger.Value.LogException(exc);
                 return new(OperationResult.Failed) { Errors = [new() { Message = exc.Message, }] };
             }
-
-            static bool IsAuthRejection(HttpStatusCode? statusCode) => statusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden;
         }
+
+        /// <summary>Shared by GetDownloadUrlAsync and the three GetXxxPriceStatusAsync methods below - gama-api rejects a caller's legacy token with either status, never anything else, for this failure shape.</summary>
+        private static bool IsAuthRejection(HttpStatusCode? statusCode) => statusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden;
 
         public Task<ResultData<GetContentPriceStatusResponseDto>> GetContentPriceStatusAsync([NotNull] GetContentPriceStatusRequestDto requestDto) => requestDto.ContentType switch
         {
@@ -127,6 +128,10 @@ namespace GamaEdtech.Infrastructure.Provider.ContentDelivery
 
         private async Task<ResultData<GetContentPriceStatusResponseDto>> GetTestPriceStatusAsync(GetContentPriceStatusRequestDto requestDto)
         {
+            // See GetDownloadUrlAsync's legacyStatusCode - same reasoning: captured before the body is read, so
+            // it's still available even when decoding a non-JSON 401/403 body throws.
+            HttpStatusCode? legacyStatusCode = null;
+
             try
             {
                 var uri = string.Format(CultureInfo.InvariantCulture, configuration.Value.GetValue<string>("Core:TestDetails")!, requestDto.ExternalContentId);
@@ -136,7 +141,16 @@ namespace GamaEdtech.Infrastructure.Provider.ContentDelivery
                     Uri = uri,
                     Request = null,
                     HeaderParameters = [("Authorization", $"Bearer {requestDto.Token}")],
+                }, postCallHandler: r =>
+                {
+                    legacyStatusCode = r.StatusCode;
+                    return Task.CompletedTask;
                 });
+
+                if (IsAuthRejection(legacyStatusCode))
+                {
+                    return new(OperationResult.Succeeded) { Data = new() { LegacyAuthRejected = true } };
+                }
 
                 if (response is not { Status: 1, Data.Files: not null })
                 {
@@ -158,6 +172,11 @@ namespace GamaEdtech.Infrastructure.Provider.ContentDelivery
             }
             catch (Exception exc)
             {
+                if (IsAuthRejection(legacyStatusCode))
+                {
+                    return new(OperationResult.Succeeded) { Data = new() { LegacyAuthRejected = true } };
+                }
+
                 Logger.Value.LogException(exc);
                 return new(OperationResult.Failed) { Errors = [new() { Message = exc.Message, }] };
             }
@@ -165,6 +184,8 @@ namespace GamaEdtech.Infrastructure.Provider.ContentDelivery
 
         private async Task<ResultData<GetContentPriceStatusResponseDto>> GetFilePriceStatusAsync(GetContentPriceStatusRequestDto requestDto)
         {
+            HttpStatusCode? legacyStatusCode = null;
+
             try
             {
                 var uri = string.Format(CultureInfo.InvariantCulture, configuration.Value.GetValue<string>("Core:MultimediaDetails")!, requestDto.ExternalContentId);
@@ -174,14 +195,32 @@ namespace GamaEdtech.Infrastructure.Provider.ContentDelivery
                     Uri = uri,
                     Request = null,
                     HeaderParameters = [("Authorization", $"Bearer {requestDto.Token}")],
+                }, postCallHandler: r =>
+                {
+                    legacyStatusCode = r.StatusCode;
+                    return Task.CompletedTask;
                 });
 
-                return response is not { Status: 1, Data.Files: not null }
-                    ? new(OperationResult.Failed) { Errors = [new() { Message = response?.Message ?? Localizer.Value["GeneralError"], }] }
-                    : new(OperationResult.Succeeded) { Data = new() { Points = response.Data.Files.Price, Paid = response.Data.Files.Paid } };
+                if (IsAuthRejection(legacyStatusCode))
+                {
+                    return new(OperationResult.Succeeded) { Data = new() { LegacyAuthRejected = true } };
+                }
+
+                if (response is not { Status: 1, Data.Files: not null })
+                {
+                    return new(OperationResult.Failed) { Errors = [new() { Message = response?.Message ?? Localizer.Value["GeneralError"], }] };
+                }
+
+                var files = response.Data.Files;
+                return new(OperationResult.Succeeded) { Data = new() { Points = files.Price, Paid = files.Paid } };
             }
             catch (Exception exc)
             {
+                if (IsAuthRejection(legacyStatusCode))
+                {
+                    return new(OperationResult.Succeeded) { Data = new() { LegacyAuthRejected = true } };
+                }
+
                 Logger.Value.LogException(exc);
                 return new(OperationResult.Failed) { Errors = [new() { Message = exc.Message, }] };
             }
@@ -189,6 +228,8 @@ namespace GamaEdtech.Infrastructure.Provider.ContentDelivery
 
         private async Task<ResultData<GetContentPriceStatusResponseDto>> GetExamPriceStatusAsync(GetContentPriceStatusRequestDto requestDto)
         {
+            HttpStatusCode? legacyStatusCode = null;
+
             try
             {
                 var uri = string.Format(CultureInfo.InvariantCulture, configuration.Value.GetValue<string>("Core:ExamApiDetails")!, requestDto.ExternalContentId);
@@ -198,7 +239,16 @@ namespace GamaEdtech.Infrastructure.Provider.ContentDelivery
                     Uri = uri,
                     Request = null,
                     HeaderParameters = [("Authorization", $"Bearer {requestDto.Token}")],
+                }, postCallHandler: r =>
+                {
+                    legacyStatusCode = r.StatusCode;
+                    return Task.CompletedTask;
                 });
+
+                if (IsAuthRejection(legacyStatusCode))
+                {
+                    return new(OperationResult.Succeeded) { Data = new() { LegacyAuthRejected = true } };
+                }
 
                 if (response is not { Status: 1, Data.Price: not null })
                 {
@@ -207,13 +257,19 @@ namespace GamaEdtech.Infrastructure.Provider.ContentDelivery
 
                 // Only `price.pdf` (downloading the exam) - `price.participation` (taking the exam) is
                 // a different action entirely, unrelated to this download endpoint.
+                var pdfPrice = response.Data.Price.Pdf;
                 return new(OperationResult.Succeeded)
                 {
-                    Data = new() { Points = response.Data.Price.Pdf?.Price, Paid = response.Data.Price.Pdf?.Paid ?? false },
+                    Data = new() { Points = pdfPrice?.Price, Paid = pdfPrice?.Paid ?? false },
                 };
             }
             catch (Exception exc)
             {
+                if (IsAuthRejection(legacyStatusCode))
+                {
+                    return new(OperationResult.Succeeded) { Data = new() { LegacyAuthRejected = true } };
+                }
+
                 Logger.Value.LogException(exc);
                 return new(OperationResult.Failed) { Errors = [new() { Message = exc.Message, }] };
             }
