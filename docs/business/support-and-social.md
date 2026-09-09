@@ -24,6 +24,28 @@ read flags: `Ticket.IsReadByAdmin` (toggled via `ToggleIsReadByAdminAsync`,
 unread-by-admin and vice versa, and an admin reply triggers a confirmation
 email to the ticket's `Email` (`:272-287`).
 
+**Bug fixed 2026-09-09, live-reported as "admin doesn't notice a new email
+arrived on a ticket":** `ReplyTicketAsync` had set *both* `IsRead` and
+`IsReadByAdmin` to the exact same expression (`!requestDto.ReplyByAdmin`),
+instead of opposite ones — a fresh customer/inbound-email reply was stamped
+`IsReadByAdmin = true`, i.e. created already marked as read by admin. That
+silently broke the "has an unread reply" signal `GetTicketsAsync`'s sort
+depends on to surface new correspondence. Compounding it, that same sort's
+`ThenBy(t => t.TicketReplys.Any(r => !r.IsReadByAdmin))` sorted *ascending* -
+even with the flag fixed, a ticket with a genuine unread reply would sort to
+the *bottom* of its `IsReadByAdmin` bucket instead of the top (`GetUserTicketsAsync`'s
+customer-facing equivalent had the identical direction bug on its own
+`OrderBy(t => t.TicketReplys.Any(r => !r.IsRead))`). And on top of both of
+those, nothing reset the *ticket's own* `IsReadByAdmin` back to `false` when
+a new non-admin reply came in - only the admin's own `ToggleIsReadByAdminAsync`
+action touched it - so a ticket an admin had already opened once stayed in
+the "already read" bucket indefinitely, sorted only by its original
+`CreationDate`, regardless of new replies. All three are now fixed:
+`IsReadByAdmin = requestDto.ReplyByAdmin` (opposite of `IsRead`, not the same
+expression); both sorts changed to `ThenByDescending`/`OrderByDescending`;
+and `ReplyTicketAsync` now resets `Ticket.IsReadByAdmin` to `false` whenever
+`!requestDto.ReplyByAdmin`.
+
 `ProccessInboundEmailAsync` (`:397-460`) supports replying to tickets by
 email: it matches inbound messages to an existing ticket by a
 `[Ticket-N]`-style subject pattern (regex at `:482`) and appends them as
