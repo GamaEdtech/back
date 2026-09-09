@@ -24,6 +24,28 @@ read flags: `Ticket.IsReadByAdmin` (toggled via `ToggleIsReadByAdminAsync`,
 unread-by-admin and vice versa, and an admin reply triggers a confirmation
 email to the ticket's `Email` (`:272-287`).
 
+**Bug fixed 2026-09-09, live-reported as "admin doesn't notice a new email
+arrived on a ticket":** `ReplyTicketAsync` had set *both* `IsRead` and
+`IsReadByAdmin` to the exact same expression (`!requestDto.ReplyByAdmin`),
+instead of opposite ones — a fresh customer/inbound-email reply was stamped
+`IsReadByAdmin = true`, i.e. created already marked as read by admin. That
+silently broke the "has an unread reply" signal `GetTicketsAsync`'s sort
+depends on to surface new correspondence. Compounding it, that same sort's
+`ThenBy(t => t.TicketReplys.Any(r => !r.IsReadByAdmin))` sorted *ascending* -
+even with the flag fixed, a ticket with a genuine unread reply would sort to
+the *bottom* of its `IsReadByAdmin` bucket instead of the top (`GetUserTicketsAsync`'s
+customer-facing equivalent had the identical direction bug on its own
+`OrderBy(t => t.TicketReplys.Any(r => !r.IsRead))`). And on top of both of
+those, nothing reset the *ticket's own* `IsReadByAdmin` back to `false` when
+a new non-admin reply came in - only the admin's own `ToggleIsReadByAdminAsync`
+action touched it - so a ticket an admin had already opened once stayed in
+the "already read" bucket indefinitely, sorted only by its original
+`CreationDate`, regardless of new replies. All three are now fixed:
+`IsReadByAdmin = requestDto.ReplyByAdmin` (opposite of `IsRead`, not the same
+expression); both sorts changed to `ThenByDescending`/`OrderByDescending`;
+and `ReplyTicketAsync` now resets `Ticket.IsReadByAdmin` to `false` whenever
+`!requestDto.ReplyByAdmin`.
+
 `ProccessInboundEmailAsync` (`:397-460`) supports replying to tickets by
 email: it matches inbound messages to an existing ticket by a
 `[Ticket-N]`-style subject pattern (regex at `:482`) and appends them as
@@ -37,6 +59,44 @@ HTML-composed inbound email is Resend's auto-generated degraded plain-text
 rendering (`<img>`/`<a>` tags flattened to `[url]text`), not the real
 message, so every inbound HTML email arrived in the ticket system already
 mangled.
+
+**Silent inbound-email loss, partially fixed 2026-09-09 (logging only -
+see below for the still-open part):** live-reported as "some inbound emails
+never show up on our side, even though Resend's webhook fires correctly."
+Resend's `email.received` webhook payload is metadata-only (`from`/`to`/
+`subject`/`message_id`/attachment list - no body), so
+`ProccessInboundEmailAsync` must make a follow-up live call back to
+Resend's API (`ReceivedEmailRetrieveAsync`, plus one more per attachment)
+just to get the content - each one a point of failure with no retry of its
+own. Before this fix, every failure branch in that method (missing
+`svix-*` header, bad/expired signature, wrong event type, a Resend API call
+throwing) returned a `Failed`/no-op result with **no logging at all** for
+most of them; the caller, `TicketService.ProccessInboundEmailAsync`, then
+discarded that result with no logging of its own; and
+`TicketsController.InboundWebHook` always answers Resend/Svix with `200`
+regardless of outcome (deliberately, same convention as
+`PaymentsController.RecurringWebhook` for Stripe - the gateway/provider
+only reads the HTTP status, and a non-200 would make it retry a
+permanently-bad event like an invalid signature forever), so Resend never
+even knows to retry. Net effect: a dropped inbound email - first message or
+reply - left zero trace anywhere it could be diagnosed from. Fixed so far:
+every failure branch in `ResendEmailProvider.ProccessInboundEmailAsync` now
+logs its specific cause (`LogWarning`, including the `svix-id` for
+cross-referencing against Resend's own dashboard), and
+`TicketService.ProccessInboundEmailAsync` now logs a warning with the
+underlying errors whenever the result isn't `Succeeded`, instead of
+silently returning.
+
+**Still open:** the fix above only makes a drop *visible* - it does not make
+a *transient* one (a Resend API hiccup fetching the content/attachments, a
+brief network blip) recoverable. That failure shape gets exactly the same
+"200, no retry" treatment as a permanently-bad signature, even though -
+unlike a bad signature - retrying it would very likely succeed. Also
+production file logging (`Serilog`, `logs/log_.log`) was itself broken for
+at least 5+ days before 2026-09-09 due to a directory-ownership mismatch on
+the VPS (see `docs/deployment/overview.md`) - any drops during that window
+left no trace even with this fix in place, since the fix only adds logging,
+it doesn't recover already-lost history.
 
 **Access scoping** is enforced at the controller layer, not inside the
 service: end-user endpoints filter by `UserTicketsSpecification(User)` /

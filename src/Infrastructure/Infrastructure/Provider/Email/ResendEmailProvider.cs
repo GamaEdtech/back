@@ -76,23 +76,33 @@ namespace GamaEdtech.Infrastructure.Provider.Email
                 var payload = await reader.ReadToEndAsync();
                 request.Body.Position = 0;
 
+                // Every early return below was previously silent - no log call at all, since none of these
+                // are exceptions (the outer catch never sees them). Combined with TicketService.
+                // ProccessInboundEmailAsync discarding a Failed result with no logging of its own, and
+                // TicketsController.InboundWebHook always answering Resend/Svix with 200 regardless of
+                // outcome (so it never retries), a dropped inbound email left zero trace anywhere. Fixed
+                // 2026-09-09 - see docs/business/support-and-social.md.
                 if (!request.Headers.TryGetValue("svix-id", out var svixId))
                 {
+                    logger.Value.LogWarning("ProccessInboundEmailAsync: missing required header 'svix-id'");
                     return new(OperationResult.Failed) { Errors = [new() { Message = "Missing required header 'svix-id'", }] };
                 }
 
                 if (!request.Headers.TryGetValue("svix-timestamp", out var svixTimestamp))
                 {
+                    logger.Value.LogWarning("ProccessInboundEmailAsync: missing required header 'svix-timestamp' (svix-id {SvixId})", svixId.ToString());
                     return new(OperationResult.Failed) { Errors = [new() { Message = "Missing required header 'svix-timestamp'", }] };
                 }
 
                 if (!request.Headers.TryGetValue("svix-signature", out var svixSignature))
                 {
+                    logger.Value.LogWarning("ProccessInboundEmailAsync: missing required header 'svix-signature' (svix-id {SvixId})", svixId.ToString());
                     return new(OperationResult.Failed) { Errors = [new() { Message = "Missing required header 'svix-signature'", }] };
                 }
 
                 if (!long.TryParse(svixTimestamp.ToString(), out _))
                 {
+                    logger.Value.LogWarning("ProccessInboundEmailAsync: invalid 'svix-timestamp' value '{SvixTimestamp}' (svix-id {SvixId})", svixTimestamp.ToString(), svixId.ToString());
                     return new(OperationResult.Failed) { Errors = [new() { Message = "Invalid value 'svix-timestamp', expected long", }] };
                 }
 
@@ -106,14 +116,30 @@ namespace GamaEdtech.Infrastructure.Provider.Email
                         { "svix-signature", svixSignature.ToString() }
                     });
                 }
-                catch (WebhookVerificationException)
+                catch (WebhookVerificationException exc)
                 {
+                    // Includes a stale/expired timestamp (Svix's own replay-tolerance window), not just a
+                    // wrong signature - worth knowing which, since one indicates tampering/misconfiguration
+                    // and the other can indicate real delivery delay (e.g. this app mid-restart/deploy when
+                    // Resend's original attempt came in, if Resend's own retry then lands outside the window).
+                    logger.Value.LogWarning(exc, "ProccessInboundEmailAsync: webhook signature verification failed (svix-id {SvixId})", svixId.ToString());
                     return new(OperationResult.Failed) { Errors = [new() { Message = "Invalid Signature", }] };
                 }
 
                 var data = await request.ReadFromJsonAsync<Data.Dto.Provider.Email.ResendResponse<ResendEmailReceivedWebhookDto>>();
-                if (!"email.received".Equals(data?.Type, StringComparison.OrdinalIgnoreCase) || data?.Data is null)
+                if (!"email.received".Equals(data?.Type, StringComparison.OrdinalIgnoreCase))
                 {
+                    // A different Resend event type (e.g. email.sent/delivered/bounced) hitting the same
+                    // endpoint - not an error, just not one this handler acts on.
+                    return new(OperationResult.Succeeded);
+                }
+
+                if (data.Data is null)
+                {
+                    // Type matched but the payload's own `data` didn't deserialize into anything usable -
+                    // e.g. a Resend payload-shape change this DTO no longer matches. Unlike the branch
+                    // above, this is a genuine anomaly worth surfacing, not an expected non-match.
+                    logger.Value.LogWarning("ProccessInboundEmailAsync: 'email.received' webhook had a null/undeserializable data payload (svix-id {SvixId})", svixId.ToString());
                     return new(OperationResult.Succeeded);
                 }
 

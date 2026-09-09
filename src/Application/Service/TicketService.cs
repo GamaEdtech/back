@@ -33,8 +33,13 @@ namespace GamaEdtech.Application.Service
             try
             {
                 var uow = UnitOfWorkProvider.Value.CreateUnitOfWork();
+                // ThenByDescending, not ThenBy (fixed 2026-09-09): within each IsReadByAdmin bucket, a
+                // ticket with a fresh unread reply (true) must sort BEFORE one with none (false) - the
+                // whole point of this key is to surface new correspondence to admin. The previous
+                // ascending ThenBy sank exactly the tickets it was meant to highlight to the bottom of
+                // their bucket instead - see docs/business/support-and-social.md.
                 var result = await uow.GetRepository<Ticket>().GetManyQueryable(requestDto?.Specification)
-                    .OrderBy(t => t.IsReadByAdmin).ThenBy(t => t.TicketReplys.Any(r => !r.IsReadByAdmin)).ThenByDescending(t => t.CreationDate).FilterListAsync(requestDto?.PagingDto);
+                    .OrderBy(t => t.IsReadByAdmin).ThenByDescending(t => t.TicketReplys.Any(r => !r.IsReadByAdmin)).ThenByDescending(t => t.CreationDate).FilterListAsync(requestDto?.PagingDto);
                 var users = await result.List.Select(t => new TicketsDto
                 {
                     Id = t.Id,
@@ -59,8 +64,11 @@ namespace GamaEdtech.Application.Service
             try
             {
                 var uow = UnitOfWorkProvider.Value.CreateUnitOfWork();
+                // OrderByDescending, not OrderBy (fixed 2026-09-09, same bug as GetTicketsAsync's admin
+                // sort above): a ticket with a fresh unread-by-the-customer reply (true) must sort
+                // BEFORE one with none (false), not after.
                 var result = await uow.GetRepository<Ticket>().GetManyQueryable(requestDto?.Specification)
-                    .OrderBy(t => t.TicketReplys.Any(r => !r.IsRead)).ThenByDescending(t => t.CreationDate).FilterListAsync(requestDto?.PagingDto);
+                    .OrderByDescending(t => t.TicketReplys.Any(r => !r.IsRead)).ThenByDescending(t => t.CreationDate).FilterListAsync(requestDto?.PagingDto);
                 var users = await result.List.Select(t => new TicketsDto
                 {
                     Id = t.Id,
@@ -260,13 +268,33 @@ namespace GamaEdtech.Application.Service
                     TicketId = requestDto.TicketId,
                     Body = requestDto.Body,
                     CreationDate = DateTimeOffset.UtcNow,
+                    // Bug fixed 2026-09-09: these were both `!requestDto.ReplyByAdmin` - identical
+                    // expressions for two fields that track different audiences. IsRead means "read
+                    // by the customer" (true when the customer themselves just wrote it), IsReadByAdmin
+                    // means "read by admin" (true when admin themselves just wrote it) - the two must be
+                    // opposites of each other for a given reply, not the same value. The old code
+                    // stamped a fresh customer reply as already IsReadByAdmin=true, which silently broke
+                    // every "has an unread reply" signal used to surface it in the admin ticket list -
+                    // see GetTicketsAsync's sort below and docs/business/support-and-social.md.
                     IsRead = !requestDto.ReplyByAdmin,
-                    IsReadByAdmin = !requestDto.ReplyByAdmin,
+                    IsReadByAdmin = requestDto.ReplyByAdmin,
                     CreationUserId = requestDto.CreationUserId,
                     FileId = fileId,
                     Receivers = requestDto.Receivers,
                 };
                 repository.Add(reply);
+
+                if (!requestDto.ReplyByAdmin)
+                {
+                    // A non-admin reply (customer, or an inbound email matched to an existing ticket via
+                    // ProccessInboundEmailAsync) means there's new correspondence admin hasn't seen yet -
+                    // reopen the ticket itself as unread, even if an admin had previously marked it read.
+                    // Without this, a ticket an admin already opened once stays in GetTicketsAsync's
+                    // "already read" bucket forever, regardless of new replies arriving on it.
+                    _ = await uow.GetRepository<Ticket>().GetManyQueryable(t => t.Id == requestDto.TicketId)
+                        .ExecuteUpdateAsync(t => t.SetProperty(p => p.IsReadByAdmin, false));
+                }
+
                 _ = await uow.SaveChangesAsync();
 
                 if (requestDto.ReplyByAdmin)
@@ -397,6 +425,18 @@ namespace GamaEdtech.Application.Service
         public async Task ProccessInboundEmailAsync(HttpRequest request)
         {
             var result = await emailService.Value.ProccessInboundEmailAsync(request);
+            if (result.OperationResult is not OperationResult.Succeeded)
+            {
+                // Fixed 2026-09-09: this used to fall through to the null-data early return just below
+                // with zero logging - combined with InboundWebHook always answering Resend/Svix with 200
+                // regardless (so it never retries a dropped email), a failure here left no trace anywhere.
+                // ResendEmailProvider's own failure branches already log their specific cause; this just
+                // makes the fact that a reply/ticket was NOT created from this webhook visible from the
+                // ticket side too. See docs/business/support-and-social.md.
+                Logger.Value.LogWarning("ProccessInboundEmailAsync: inbound email webhook processing failed - {Errors}",
+                    string.Join("; ", result.Errors?.Select(t => t.Message) ?? []));
+            }
+
             if (result.Data is null)
             {
                 return;
