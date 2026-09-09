@@ -425,6 +425,18 @@ namespace GamaEdtech.Application.Service
         public async Task ProccessInboundEmailAsync(HttpRequest request)
         {
             var result = await emailService.Value.ProccessInboundEmailAsync(request);
+            if (result.OperationResult is not OperationResult.Succeeded)
+            {
+                // Fixed 2026-09-09: this used to fall through to the null-data early return just below
+                // with zero logging - combined with InboundWebHook always answering Resend/Svix with 200
+                // regardless (so it never retries a dropped email), a failure here left no trace anywhere.
+                // ResendEmailProvider's own failure branches already log their specific cause; this just
+                // makes the fact that a reply/ticket was NOT created from this webhook visible from the
+                // ticket side too. See docs/business/support-and-social.md.
+                Logger.Value.LogWarning("ProccessInboundEmailAsync: inbound email webhook processing failed - {Errors}",
+                    string.Join("; ", result.Errors?.Select(t => t.Message) ?? []));
+            }
+
             if (result.Data is null)
             {
                 return;

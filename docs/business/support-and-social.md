@@ -60,6 +60,44 @@ rendering (`<img>`/`<a>` tags flattened to `[url]text`), not the real
 message, so every inbound HTML email arrived in the ticket system already
 mangled.
 
+**Silent inbound-email loss, partially fixed 2026-09-09 (logging only -
+see below for the still-open part):** live-reported as "some inbound emails
+never show up on our side, even though Resend's webhook fires correctly."
+Resend's `email.received` webhook payload is metadata-only (`from`/`to`/
+`subject`/`message_id`/attachment list - no body), so
+`ProccessInboundEmailAsync` must make a follow-up live call back to
+Resend's API (`ReceivedEmailRetrieveAsync`, plus one more per attachment)
+just to get the content - each one a point of failure with no retry of its
+own. Before this fix, every failure branch in that method (missing
+`svix-*` header, bad/expired signature, wrong event type, a Resend API call
+throwing) returned a `Failed`/no-op result with **no logging at all** for
+most of them; the caller, `TicketService.ProccessInboundEmailAsync`, then
+discarded that result with no logging of its own; and
+`TicketsController.InboundWebHook` always answers Resend/Svix with `200`
+regardless of outcome (deliberately, same convention as
+`PaymentsController.RecurringWebhook` for Stripe - the gateway/provider
+only reads the HTTP status, and a non-200 would make it retry a
+permanently-bad event like an invalid signature forever), so Resend never
+even knows to retry. Net effect: a dropped inbound email - first message or
+reply - left zero trace anywhere it could be diagnosed from. Fixed so far:
+every failure branch in `ResendEmailProvider.ProccessInboundEmailAsync` now
+logs its specific cause (`LogWarning`, including the `svix-id` for
+cross-referencing against Resend's own dashboard), and
+`TicketService.ProccessInboundEmailAsync` now logs a warning with the
+underlying errors whenever the result isn't `Succeeded`, instead of
+silently returning.
+
+**Still open:** the fix above only makes a drop *visible* - it does not make
+a *transient* one (a Resend API hiccup fetching the content/attachments, a
+brief network blip) recoverable. That failure shape gets exactly the same
+"200, no retry" treatment as a permanently-bad signature, even though -
+unlike a bad signature - retrying it would very likely succeed. Also
+production file logging (`Serilog`, `logs/log_.log`) was itself broken for
+at least 5+ days before 2026-09-09 due to a directory-ownership mismatch on
+the VPS (see `docs/deployment/overview.md`) - any drops during that window
+left no trace even with this fix in place, since the fix only adds logging,
+it doesn't recover already-lost history.
+
 **Access scoping** is enforced at the controller layer, not inside the
 service: end-user endpoints filter by `UserTicketsSpecification(User)` /
 `UserTicketReplysSpecification(id, User)`
