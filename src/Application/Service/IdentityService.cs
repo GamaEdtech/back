@@ -1515,9 +1515,23 @@ namespace GamaEdtech.Application.Service
                 // gama-api already accepted the change (result above succeeded) - this side only needs to catch
                 // up. A failure from here on out must not be reported as if the whole operation failed; gama-api
                 // is the source of truth and it already has the new value.
+                //
+                // Fixed 2026-09-11, live-reported: this is the actual self-service action behind a user
+                // picking "Teacher" (as opposed to SyncLegacyAuthAsync's passive login re-sync), and it never
+                // called DefaultTeacherProfileToPublicAsync - so selecting Teacher here never flipped
+                // ProfileVisibility to Public, leaving a real teacher stuck on the usual Private default with
+                // no path to being discoverable via GET identities/profiles/list. Checked before the change so
+                // it only fires the first time this user ever holds Role.Teacher/Student - switching between
+                // the two roles later never re-applies it, same "first time only" guarantee as
+                // DefaultTeacherProfileToPublicAsync's other two call sites (see its doc comment).
+                var hadRoleAlready = (await userManager.Value.GetRolesAsync(user)).Any(t => t is nameof(Role.Teacher) or nameof(Role.Student));
                 user.Group = group;
                 _ = await userManager.Value.UpdateAsync(user);
                 _ = await SyncRoleFromGroupAsync(user, group);
+                if (!hadRoleAlready)
+                {
+                    await DefaultTeacherProfileToPublicAsync(user);
+                }
 
                 return result;
             }
@@ -1786,11 +1800,6 @@ namespace GamaEdtech.Application.Service
             else
             {
                 user.CoreId = coreId;
-                // Deliberately outside the !ProfileUpdated guard below, unlike every other synced field here -
-                // Group (teacher/student, see ApplicationUser.Group's doc comment) is the one profile value
-                // gama-api keeps owning permanently: it's re-synced on every single legacy login, not just the
-                // first one, so a Group change on gama-api's side takes effect here next time this user logs in.
-                user.Group = authData.Group;
                 if (!user.ProfileUpdated)
                 {
                     await ApplyAvatarAsync(user, authData);
@@ -1800,7 +1809,32 @@ namespace GamaEdtech.Application.Service
                     user.PhoneNumber ??= authData.PhoneNumber;
                 }
                 _ = await userManager.Value.UpdateAsync(user);
-                _ = await SyncRoleFromGroupAsync(user, authData.Group);
+
+                // Fixed 2026-09-11, live decision - this used to unconditionally re-derive Group/Role from
+                // gama-api's Group on every single legacy login (the removed comment here previously
+                // documented that as deliberate). Two live-reported problems with it: gama-api could
+                // silently flip a user's Role.Teacher/Student assignment at any time with no local
+                // decision involved, and - the actual root cause behind a "teachers stuck Private" report -
+                // this path never called DefaultTeacherProfileToPublicAsync, so a user who only became a
+                // teacher on a login after their very first one never got the "new teacher defaults to
+                // Public" treatment the "create new user" branch above gives (it's scoped to Role
+                // membership, not to which branch runs, so applying it here on the same first-assignment
+                // event is the same guarantee, just not restricted to brand-new accounts).
+                //
+                // This backend is now authoritative for Role once assigned: if the user already holds
+                // Role.Teacher or Role.Student, a later legacy login no longer touches Group/Role at all -
+                // gama-api's Group is only consulted the first time a role gets assigned locally. The
+                // *explicit* self-service action, LegacyUpdateGroupAsync, is a separate, deliberate
+                // decision made through this backend (not passive login sync) and is unaffected by this -
+                // it still applies a group/role change live, every time it's called.
+                var currentRoles = await userManager.Value.GetRolesAsync(user);
+                if (!currentRoles.Contains(nameof(Role.Teacher)) && !currentRoles.Contains(nameof(Role.Student)))
+                {
+                    user.Group = authData.Group;
+                    _ = await userManager.Value.UpdateAsync(user);
+                    _ = await SyncRoleFromGroupAsync(user, authData.Group);
+                    await DefaultTeacherProfileToPublicAsync(user);
+                }
             }
 
             return new(OperationResult.Succeeded)
@@ -1893,16 +1927,21 @@ namespace GamaEdtech.Application.Service
         }
 
         /// <summary>
-        /// New-account-only default: a brand-new legacy-sync-created user who was just assigned Role.Teacher
-        /// (via SyncRoleFromGroupAsync, called right before this) starts with a Public profile instead of the
-        /// usual Private default, so teachers are discoverable via GET identities/profiles/list out of the box
-        /// (that endpoint hard-filters to ProfileVisibility.Public - IdentitiesController.GetPublicProfile).
-        /// Keyed off the actual Role.Teacher membership (not Group directly), so it only fires if the role sync
-        /// above actually succeeded. Deliberately only called from the "create new user" branch of
-        /// SyncLegacyAuthAsync - never re-applied on a later login/role change, so an existing user's own
-        /// ProfileVisibility choice (via ManageProfileSettingsAsync) or an existing account's current setting is
-        /// never overwritten. Best-effort, same as SyncRoleFromGroupAsync: a failure here must not block the
-        /// surrounding login.
+        /// First-time-teacher default: a user who was just assigned Role.Teacher for the first time (via
+        /// SyncRoleFromGroupAsync, called right before this) starts with a Public profile instead of the usual
+        /// Private default, so teachers are discoverable via GET identities/profiles/list out of the box (that
+        /// endpoint hard-filters to ProfileVisibility.Public - IdentitiesController.GetPublicProfile). Keyed off
+        /// the actual Role.Teacher membership (not Group directly), so it only fires if the role sync above
+        /// actually succeeded.
+        ///
+        /// Called from three places, each guarded by its caller to fire only on the *first* time a role is
+        /// assigned to a given user, never on a later login/role change once one is already held: the "create
+        /// new user" and (fixed 2026-09-11) "existing user, first role assignment" branches of
+        /// SyncLegacyAuthAsync, and LegacyUpdateGroupAsync (the explicit self-service group-change action,
+        /// which is always-live for the Group/Role assignment itself but still only defaults visibility once).
+        /// This means an existing user's own later ProfileVisibility choice (via ManageProfileSettingsAsync) is
+        /// never overwritten by this - it can only ever run once, at the moment a role is first held. Best-
+        /// effort, same as SyncRoleFromGroupAsync: a failure here must not block the surrounding login/action.
         /// </summary>
         private async Task DefaultTeacherProfileToPublicAsync(ApplicationUser user)
         {
