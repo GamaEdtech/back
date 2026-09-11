@@ -219,51 +219,68 @@ their `Group` value) — `Group` is what the system actually uses to distinguish
 today, not `Role`.
 
 `Group` is set once at first legacy-auth sync like the other profile fields (`FirstName`,
-`Gender`, etc. — see "Legacy-auth bridge" above) with one exception: **it's the only field
-`SyncLegacyAuthAsync` re-syncs on every single legacy login**, not just the first one
-(`IdentityService.cs`, `user.Group = authData.Group;` sits outside the `!user.ProfileUpdated`
-guard the other fields are behind). So unlike the rest of a synced profile, which this app owns
-after the first login, gama-api can still change a user's `Group` at any time and it'll take
-effect here the next time they log in through the legacy bridge.
+`Gender`, etc. — see "Legacy-auth bridge" above).
 
-**`Role.Teacher`/`Role.Student` are now kept in sync with `Group` automatically** (added
-2026-08-22, `IdentityService.SyncRoleFromGroupAsync`, called right after `Group` is set/updated in
-both branches of `SyncLegacyAuthAsync`). Deliberately additive-plus-swap, not a full role replace:
-adds the matching role (`Teacher` for `Group = 5`, `Student` for `Group = 6`) if the user doesn't
-already have it, and removes the *other* of Teacher/Student if present — so `Role` stays an
-accurate mirror of `Group` even if it changes later — but never touches any other role
-(`Admin`/`Advisor`/`Finance`); since `Role` is a flags enum, a user who's also an `Admin` keeps
-that role regardless. `Group` values with no known mapping (`NULL`, `1`, `2`, `3`, `7`) leave
-existing Teacher/Student role membership untouched — guessing a removal for an unrecognized value
-would be worse than doing nothing. Best-effort: a failure here is logged and swallowed, never
-fails the login itself. This only fires going forward, on each legacy login — it does not itself
-backfill role assignment for users who predate it; that's a separate one-time operation, see
-"One-time backfill for existing users" below.
+**Changed 2026-09-11 (live decision, replacing the "re-synced on every login" behavior below this
+paragraph until that date):** `Group` used to be the one field `SyncLegacyAuthAsync` re-synced on
+*every* single legacy login, not just the first one — gama-api could silently flip a user's
+`Role.Teacher`/`Student` assignment at any time, with no local decision involved, and (the actual
+root cause behind a live "teachers stuck Private" report) a user who only became a teacher on a
+login *after* their very first one never got the new-teacher-defaults-to-Public treatment described
+below, since that was scoped to the "create new user" branch only. This backend is now authoritative
+for `Role` once assigned: in `SyncLegacyAuthAsync`'s "existing user" branch, gama-api's `Group` is
+only consulted **the first time** this user is found to hold neither `Role.Teacher` nor
+`Role.Student` locally — once one of those is assigned, a later legacy login no longer touches
+`Group`/`Role` at all, regardless of what gama-api reports. The explicit self-service action,
+`LegacyUpdateGroupAsync` (a user actively picking Teacher/Student, as opposed to a passive login
+re-sync), is unaffected by this and still applies a `Group`/`Role` change live, every time it's
+called — see below.
+
+**`Role.Teacher`/`Role.Student` are kept in sync with `Group` automatically** (added 2026-08-22,
+`IdentityService.SyncRoleFromGroupAsync`, called from three places: both branches of
+`SyncLegacyAuthAsync` — the "existing user" one now gated as described above — and
+`LegacyUpdateGroupAsync`). Deliberately additive-plus-swap, not a full role replace: adds the
+matching role (`Teacher` for `Group = 5`, `Student` for `Group = 6`) if the user doesn't already
+have it, and removes the *other* of Teacher/Student if present — but never touches any other role
+(`Admin`/`Advisor`/`Finance`); since `Role` is a flags enum, a user who's also an `Admin` keeps that
+role regardless. `Group` values with no known mapping (`NULL`, `1`, `2`, `3`, `7`) leave existing
+Teacher/Student role membership untouched — guessing a removal for an unrecognized value would be
+worse than doing nothing. Best-effort: a failure here is logged and swallowed, never fails the
+login/action itself. This only fires going forward — it does not itself backfill role assignment
+for users who predate it; that was a separate one-time operation, see "One-time backfill for
+existing users" below.
 
 `CoreProvider.cs` reads this off gama-api's own response via `info?.Group.ValueOf<int?>()` — on
 gama-api's side it's apparently a real enum/smart-enum type; this app only ever sees and stores
 the flattened raw integer, never gama-api's own type definition, which is why this repo has no
 local named constants for it beyond the confirmed `5`/`6`.
 
-**New teacher accounts default to a Public profile** (added 2026-08-22,
-`IdentityService.DefaultTeacherProfileToPublicAsync`, called right after `SyncRoleFromGroupAsync`
-in the "create new user" branch of `SyncLegacyAuthAsync`). Every account otherwise starts with
-`ProfileVisibility.Private` (see `RegisterAsync`/`SyncLegacyAuthAsync`), which means it's excluded
-by default from `GET identities/profiles/list` (hard-filtered to `ProfileVisibility.Public` —
-`IdentitiesController.GetPublicProfile`). For a brand-new user who was just assigned `Role.Teacher`
-by the role-sync above, this flips the starting value to `Public` instead, so new teachers are
-discoverable in that listing out of the box. Deliberately scoped narrowly:
+**New teachers default to a Public profile** (added 2026-08-22,
+`IdentityService.DefaultTeacherProfileToPublicAsync`; scope widened 2026-09-11 — see the fix above).
+Every account otherwise starts with `ProfileVisibility.Private` (see `RegisterAsync`/
+`SyncLegacyAuthAsync`), which means it's excluded by default from `GET identities/profiles/list`
+(hard-filtered to `ProfileVisibility.Public` — `IdentitiesController.GetPublicProfile`). For a user
+who was just assigned `Role.Teacher` by the role-sync above, this flips the value to `Public`
+instead, so new teachers are discoverable in that listing out of the box. Scoping:
 
 - Keyed off the actual `Role.Teacher` membership (re-checked via `IsInRoleAsync` after the role
   sync call), not `Group` directly — it only fires if that role sync actually succeeded.
-- **New accounts only.** Never re-applied on a later login, `Group`/role change, or via the
-  `legacy-auth/group` proxy — an existing user's own `ProfileVisibility` choice (via
-  `ManageProfileSettingsAsync`) or an existing account's current setting is never overwritten. A
-  teacher who already existed before this shipped, or whose account predates being assigned
-  `Role.Teacher`, keeps whatever `ProfileVisibility` they already have; a teacher can still switch
-  back to `Private` any time via `ManageProfileSettingsAsync`, same as any other user.
+- **First-time role assignment only, from any of its three call sites** (the two `SyncLegacyAuthAsync`
+  branches and `LegacyUpdateGroupAsync`) — each caller checks whether the user already held
+  `Role.Teacher`/`Student` *before* changing anything, and only calls this when they didn't. So it
+  fires exactly once per user, whichever of the three paths gets there first; a later `Group`/role
+  change (a legacy login once a role is already held, or an explicit switch between Teacher and
+  Student via `LegacyUpdateGroupAsync`) never re-applies it — an existing user's own later
+  `ProfileVisibility` choice (via `ManageProfileSettingsAsync`) is never overwritten by this. A
+  teacher can still switch back to `Private` any time via `ManageProfileSettingsAsync`, same as any
+  other user.
 - Best-effort, same as `SyncRoleFromGroupAsync`: a failure here is logged and swallowed, never
-  fails the login itself.
+  fails the login/action itself.
+- **Not wired into `ManageProfileSettingsAsync`** — that endpoint lets a user set their own `Group`
+  directly (`user.Group = requestDto.Group ?? user.Group`) but calls neither `SyncRoleFromGroupAsync`
+  nor `DefaultTeacherProfileToPublicAsync`, so `Role` and default visibility don't follow a `Group`
+  change made through *that* path. Not fixed here — flagging as a known gap, same shape as the two
+  fixed above, if that field is actually reachable/used from the frontend.
 
 ### One-time backfill for existing users (removed 2026-09-03)
 
